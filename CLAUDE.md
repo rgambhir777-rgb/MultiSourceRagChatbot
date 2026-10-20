@@ -184,9 +184,9 @@ no CORS configuration and no hard-coded hostnames are needed.
 pip install -r requirements.txt          # install pinned deps
 docker compose up -d                     # start all services
 docker compose ps                        # check service health
-uvicorn app.main:app --reload            # run API locally (dev)
-pytest -m "not integration"              # fast backend unit tests
-pytest                                   # all backend tests (needs docker services)
+uvicorn app.main:create_app --factory --reload   # run API locally (dev) at http://127.0.0.1:8000
+pytest                                   # fast, free unit tests (default excludes integration/openai)
+pytest -m integration                    # tests against real services (needs docker + OpenAI key)
 ruff format . ; ruff check .             # backend format + lint
 
 cd frontend

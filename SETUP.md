@@ -169,7 +169,7 @@ docker compose ps                              # qdrant, postgres, mlflow all "h
 | Qdrant | http://localhost:6333/dashboard | Qdrant web UI |
 | Postgres | `docker compose exec postgres pg_isready` | `accepting connections` |
 | MLflow | http://localhost:5000 | MLflow UI |
-| API (dev) | `uvicorn app.main:app --reload`, then http://localhost:8000/ready | all deps `ok`, including `openai` |
+| API (dev) | `uvicorn app.main:create_app --factory --reload`, then http://localhost:8000/ready | all deps `ok`, including `openai` |
 
 ## Part C — Frontend development (available after Session 9)
 

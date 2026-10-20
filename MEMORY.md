@@ -145,3 +145,51 @@ append an entry using the template. At the start of every session, read the late
 **Open:**
 - The OpenAI docs page didn't explicitly confirm structured-output support for the GPT-6 models. Verify it in Session 6 with a real call.
 - The owner needs an OpenAI API key and a project budget limit before Session 1 (SETUP A5).
+
+---
+
+## Session 1 / Phase 1 — Foundation (2026-10-20), IN PROGRESS: code done, waiting on Docker + OpenAI key
+
+**Done (on branch `session-1`):**
+- Project docs:
+  - Divided the plan into 7 phases (`PLAN.md` §4) and grouped the README roadmap by phase.
+- Environment:
+  - Installed Python 3.12.10 (via `py install 3.12`) and created `.venv`. All of `requirements.txt` installed, and `pip check` is clean.
+  - Created `.env` from `.env.example`. The OpenAI key is still empty, and the owner adds it.
+- Tooling: `pyproject.toml` (ruff rules incl. security `S`; pytest markers; plain `pytest` skips integration/openai tests) and `.dockerignore`.
+- App code:
+  - `app/config.py`: typed Settings for every `.env` key. Secrets are `SecretStr`, empty values count as "not set", and invalid values fail fast.
+  - `app/logging_setup.py`: structlog. Readable console logs in dev, JSON in prod, and uvicorn logs routed through it.
+  - `app/agent/llm.py`: `make_openai_client()`, the only place OpenAI clients are created.
+  - `app/api/schemas.py` and `app/api/routes_health.py`: `/health` (liveness) and `/ready`. `/ready` checks Qdrant, Postgres, MLflow and OpenAI in parallel, each with a 5 s timeout, and returns 503 with per-dependency details. OpenAI error text is never echoed, because it can contain part of the key.
+  - `app/main.py`: `create_app()` factory plus lifespan, which opens and closes the shared httpx and OpenAI clients.
+- Infrastructure: `docker-compose.yml` with Qdrant v1.19.2, Postgres 17.11 and MLflow v3.17.1 (SQLite backend).
+  - Named volumes, healthchecks, and ports bound to 127.0.0.1 only.
+  - MLflow uses `--allowed-hosts` (verified the flag exists in the 3.17.1 source).
+- Tests:
+  - 17 unit tests (config + health/ready with fake checks).
+  - 1 integration test (`pytest -m integration`).
+
+**Verified:**
+- `pytest` → 17 passed (also with ResourceWarnings as errors).
+- `ruff format --check` and `ruff check` → clean.
+- Ran the real server with `uvicorn app.main:create_app --factory`:
+  - `/health` → 200 and `/docs` → 200.
+  - `/ready` → 503, correctly reporting Qdrant/MLflow "connection failed", Postgres "timed out after 5s" and OpenAI "key not set". All checks finished within one ~5 s timeout window.
+- `docker-compose.yml` parses as valid YAML. **Not yet run, because Docker isn't installed.**
+
+**Decisions:**
+- The API runs via the factory (`--factory`), so tests can build apps with their own settings.
+- The Postgres readiness check uses the sync driver in a worker thread, avoiding the Windows async issue until Session 8.
+- `/ready` checks both configured OpenAI model IDs with a free `models.retrieve` call.
+- Default `API_HOST` is now 127.0.0.1.
+- Added `HEALTH_CHECK_TIMEOUT_S` to `.env.example`.
+
+**Open — to finish the Phase 1 Definition of Done (owner):**
+1. Install WSL2 (admin + reboot) and Rancher Desktop (dockerd, Kubernetes off): SETUP A3–A4.
+2. Set up the OpenAI project, budget limit and key, then paste the key into `.env`: SETUP A5/A9.
+3. Run `docker compose up -d` → `docker compose ps` should show 3 healthy services. The Qdrant healthcheck uses a bash `/dev/tcp` trick that has not been tested on a real container yet.
+4. Run `pytest -m integration` → `/ready` returns 200 with all 4 dependencies `ok`.
+5. Merge `session-1` into `main` via a pull request on GitHub.
+
+**Learned (glossary updated):** app factory, lifespan, SecretStr, fail fast, asyncio.gather, timeouts, worker threads, fixtures, markers, TestClient, named volumes, binding to 127.0.0.1, feature branches, pull requests.
