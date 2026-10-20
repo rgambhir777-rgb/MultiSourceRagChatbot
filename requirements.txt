@@ -1,0 +1,51 @@
+# requirements.txt — pinned direct dependencies of the PYTHON BACKEND, for Python 3.12 (64-bit Windows & Linux containers).
+# Verified 2026-10-20: the whole set resolves to binary wheels for Python 3.12 / win_amd64 with no conflicts.
+# Transitive dependencies are resolved by pip. Upgrade ONE package at a time, then run tests.
+# Never add a package here without the owner's approval (CLAUDE.md rule 2).
+
+# ---------- Web API ----------
+fastapi==0.152.0                 # typed HTTP API, auto docs at /docs
+uvicorn[standard]==0.54.0        # ASGI server that runs FastAPI
+sse-starlette==3.5.0             # Server-Sent Events for streaming chat tokens
+python-multipart==0.0.32         # needed by FastAPI for file uploads
+
+# ---------- Config & validation ----------
+pydantic==2.14.1                 # data models + validation everywhere
+pydantic-settings==2.16.1        # loads .env / env vars into a typed Settings object
+
+# ---------- Agent orchestration & LLM ----------
+langgraph==1.2.16                # agent graph: nodes, conditional edges, loops
+langgraph-checkpoint-postgres==3.2.0  # persists graph state (session memory) in Postgres
+langchain-core==1.6.12           # message types, prompt templates (used by LangGraph)
+langchain-ollama==1.1.0          # ChatOllama client with streaming + structured output
+langchain-text-splitters==1.1.3  # markdown-header, recursive and code-aware chunking
+
+# ---------- Retrieval ----------
+qdrant-client==1.19.1            # talks to the Qdrant vector DB (hybrid query, RRF)
+fastembed==0.9.0                 # ONNX CPU models: dense, BM25 sparse, cross-encoder reranker
+
+# ---------- Ingestion ----------
+markitdown[pdf,docx]==0.1.8      # PDF/DOCX/MD/TXT -> Markdown
+gitpython==3.2.1                 # shallow-clone GitHub repos (needs git installed)
+
+# ---------- Database ----------
+psycopg[binary]==3.3.6           # PostgreSQL driver (async-capable)
+psycopg-pool==3.3.3              # connection pooling for psycopg
+
+# ---------- Observability ----------
+mlflow-tracing==3.17.1           # lightweight MLflow client: traces + LangGraph autolog
+structlog==26.1.0                # structured JSON logging
+
+# ---------- HTTP client & resilience ----------
+httpx==0.28.1                    # HTTP client (GitHub API calls, API tests incl. SSE streams)
+tenacity==9.2.1                  # retries with backoff for flaky network calls
+
+# (The web UI is React — its dependencies live in frontend/package.json, not here.)
+
+# ---------- Dev & test ----------
+pytest==9.1.1                    # test runner
+pytest-asyncio==1.4.0            # async test support
+ruff==0.17.1                     # linter + formatter
+
+# ---------- Stretch A: evaluation (uncomment in Stretch A, with approval) ----------
+# deepeval==4.3.1                # hallucination/faithfulness/relevancy/bias metrics (verified to resolve with the above)

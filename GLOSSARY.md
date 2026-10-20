@@ -1,0 +1,152 @@
+# GLOSSARY.md — Beginner Terms
+
+Plain-language definitions. Add new terms as you meet them (alphabetical within each section).
+
+## AI & LLM basics
+
+- **LLM (Large Language Model):** A model trained to predict the next piece of text. Given a prompt, it generates a continuation (an answer).
+- **Parameters (e.g., "4B"):** The model's learned numbers. 4B = 4 billion. More parameters usually means smarter, but also slower and more RAM.
+- **Quantization (Q4, Q8):** Storing the parameters with fewer bits so the model fits in less RAM and runs faster, with a small quality loss. Ollama models default to ~4-bit.
+- **Token:** A chunk of text the model reads or writes (≈ ¾ of an English word). Speed is measured in tokens/second.
+- **Context window (`num_ctx`):** The maximum number of tokens the model can "see" at once: system prompt, history, retrieved chunks and the answer together.
+- **Prompt / system prompt:** The text we send to the model. The *system* prompt sets the rules ("answer only from the context").
+- **Temperature:** The randomness of the output. Low (0–0.2) = focused and repeatable, which is good for RAG and judging.
+- **Inference:** Running a trained model to get an output. We do inference on CPU.
+- **Hallucination:** The model states something that sounds plausible but isn't supported by facts or the provided context.
+- **Thinking / reasoning mode:** Some models write hidden "thoughts" before answering. Better on hard problems, but much slower on a CPU, so we turn it off.
+- **Structured output:** Forcing the model to reply in a fixed JSON shape (a schema) so code can read it reliably.
+- **LLM-as-judge:** Using an LLM to evaluate something (Is this chunk relevant? Is this answer grounded?).
+- **Ollama:** The local program that downloads and runs LLMs and exposes them over HTTP at port 11434.
+
+## RAG & retrieval
+
+- **RAG (Retrieval-Augmented Generation):** First *retrieve* relevant pieces of your documents, then have the LLM *generate* an answer using them. The model answers from your data, not just its memory.
+- **Agentic RAG:** RAG where the system makes decisions in a loop (route, judge relevance, rewrite the question, check the answer) instead of one fixed pass.
+- **Ingestion:** Loading documents into the system: parse, split, embed, store.
+- **Chunk / chunking:** Splitting a document into small passages (e.g., ~500 tokens). We retrieve chunks, not whole documents.
+- **Chunk overlap:** Repeating a little text between neighbouring chunks so ideas cut at a boundary aren't lost.
+- **Metadata / payload:** Extra info stored with each chunk (file name, page, section, repo path). Used for citations and filters.
+- **Embedding:** A list of numbers (a vector) that represents the meaning of a text. Similar meanings give nearby vectors.
+- **Dense vector:** An embedding where every position has a value (e.g., 384 numbers). Captures meaning.
+- **Sparse vector:** A huge vector where almost every position is 0, with non-zero values only for the words present. Captures exact keywords.
+- **Cosine similarity:** A score for how closely two vectors point in the same direction (1 = same meaning).
+- **BM25:** A classic keyword-ranking formula (used by search engines) that rewards rare words matching the query.
+- **Hybrid search:** Running dense (meaning) and sparse (keyword) search together and combining the results.
+- **RRF (Reciprocal Rank Fusion):** Combines several ranked lists by giving each item `1/(k + rank)` points from each list. It is simple and robust.
+- **Top-k:** Keep the best k results (e.g., top-20 candidates, then top-5 after reranking).
+- **Bi-encoder:** Embeds the question and the chunk *separately*, then compares the vectors. Fast. This is how vector search works.
+- **Cross-encoder / reranker:** Reads the question *and* the chunk together and outputs a relevance score. Accurate but slow, so we use it only on a short list.
+- **Vector database:** A database built to store vectors and quickly find the nearest ones (Qdrant here).
+- **Collection (Qdrant):** Like a table: a named set of points (vectors + payload).
+- **Point (Qdrant):** One stored item: an ID, one or more vectors, and a payload.
+- **Grounding / grounded answer:** Every claim in the answer is supported by the retrieved chunks.
+- **Citation:** A marker like `[2]` that links a sentence to the chunk it came from.
+- **Query rewriting:** Rephrasing a question (adding keywords, removing ambiguity) to get better search results.
+- **Routing:** Deciding which path a question takes (search the documents vs answer directly).
+- **Golden dataset:** A hand-made list of questions with known correct answers and sources, used to measure quality.
+- **hit@k:** The share of questions where the correct source appears in the top-k results.
+- **MRR (Mean Reciprocal Rank):** The average of `1/rank` of the first correct result. Higher means the right answer appears nearer the top.
+- **Prompt injection:** Text inside a document that tries to give the model instructions ("ignore previous rules…"). We treat document text as data, not instructions.
+
+## Agents & memory
+
+- **Agent:** A program where an LLM decides some of the next steps, rather than every step being fixed in code.
+- **LangGraph:** A library for building agents as graphs of steps with shared state.
+- **Graph / node / edge:** A node is a step (a Python function). An edge says what runs next. A *conditional edge* chooses the next node based on the state.
+- **State:** The shared data the nodes read and update (question, retrieved chunks, answer, counters).
+- **Reducer:** A rule for how a state field is updated (e.g., *append* new messages instead of replacing them).
+- **Checkpointer / checkpoint:** A saved snapshot of the graph's state after each step, stored in Postgres. It is how memory survives restarts.
+- **Thread / session:** One conversation. Its ID (`session_id` = LangGraph `thread_id`) selects which memory to load.
+- **Loop guard:** A maximum count (e.g., 2 rewrites) that stops an agent looping forever.
+- **Fallback:** A safe default used when something fails (e.g., the model returns invalid JSON).
+
+## Backend & APIs
+
+- **API:** A defined way for programs to talk to each other. Ours is HTTP + JSON.
+- **Endpoint / route:** One URL + method the API offers, e.g., `POST /chat`.
+- **FastAPI:** A Python framework for building APIs with automatic validation and docs at `/docs`.
+- **Uvicorn:** The server program that runs the FastAPI app.
+- **Pydantic model:** A Python class describing data shape + types. Invalid input is rejected automatically.
+- **Async / await:** A way for one Python process to handle many waiting tasks (network calls, streams) without blocking.
+- **Event loop:** The engine that runs async code. On Windows the default type has quirks with some database drivers.
+- **Streaming:** Sending the response in pieces as it's produced, instead of all at the end.
+- **SSE (Server-Sent Events):** A simple standard for streaming events from server to client over one HTTP connection.
+- **Background task / job:** Work that continues after the HTTP response returns (e.g., ingesting a large repo). Its status is polled with a `job_id`.
+- **Healthcheck — liveness vs readiness:** *Liveness* (`/health`) means "the process is running". *Readiness* (`/ready`) means "it can reach its dependencies and serve traffic".
+- **Connection pool:** A set of reusable open database connections. It is faster than connecting on every request.
+- **Idempotent:** Doing it twice has the same effect as doing it once (e.g., re-ingesting an unchanged file).
+- **Content hash (SHA-256):** A fingerprint of a file's content. Same content gives the same hash, which lets us skip duplicates.
+- **Environment variables / `.env`:** Settings given to a program from outside its code (URLs, model names, secrets). `.env` holds them locally and is never committed.
+- **12-factor config:** The practice of keeping configuration in the environment, not in code.
+
+## Frontend (React, JavaScript)
+
+- **Frontend / backend:** The frontend is what runs in the browser (our React app). The backend is the server (our Python API). They talk only over HTTP.
+- **JavaScript (JS):** The programming language browsers run. React apps are written in it.
+- **Node.js:** A program that runs JavaScript outside the browser. We need it for the frontend *tools* (Vite, tests, linting), not to run our backend.
+- **npm / `package.json` / `package-lock.json`:** npm is JavaScript's package installer (like pip). `package.json` lists the dependencies and scripts. The lockfile records the exact version of every package so installs are reproducible. `npm ci` installs exactly what the lockfile says.
+- **React:** A library for building UIs out of components. When data changes, React updates the screen for you.
+- **Component:** A JavaScript function that returns UI (e.g., `<MessageBubble />`). Apps are trees of components.
+- **JSX:** The HTML-like syntax inside JavaScript (`<div>{text}</div>`) that React uses to describe UI.
+- **Props:** Inputs passed from a parent component to a child, like function arguments.
+- **State (React):** Data a component remembers between renders (e.g., the messages list). Changing it re-renders the component.
+- **Hook:** A special React function starting with `use` (`useState`, `useEffect`) that adds features to components. A *custom hook* (`useChatStream`) bundles related logic for reuse.
+- **Effect (`useEffect`):** Code that runs after rendering to sync with the outside world (fetch data, start a timer). Its *cleanup* undoes it (abort the request).
+- **Re-render:** React calling a component function again to compute updated UI.
+- **SPA (Single-Page Application):** One HTML page whose content is swapped by JavaScript, with no full page reloads.
+- **Vite:** The frontend build tool. `npm run dev` gives a fast dev server. `npm run build` produces optimised static files in `dist/`.
+- **Build / bundle:** Converting our source files (JSX, many modules) into a few optimised files browsers can load quickly.
+- **Dev proxy:** A Vite setting that forwards `/api/...` requests from the dev server to the Python backend, so the browser sees one origin.
+- **Origin / same-origin:** An origin is scheme + host + port (e.g., `http://localhost:8080`). The browser freely allows requests to the *same* origin.
+- **CORS:** The browser's rules for calling a *different* origin. That origin must opt in. We avoid needing it by proxying `/api`.
+- **Reverse proxy (nginx):** A server that receives requests and forwards them to another server. Our nginx serves the React files and forwards `/api` to FastAPI.
+- **Proxy buffering:** A proxy collecting the whole response before sending it on. That breaks streaming, so we turn it off for `/api`.
+- **`fetch`:** The browser's built-in function for HTTP requests.
+- **ReadableStream / TextDecoder:** Let us read a response *piece by piece* as it arrives and turn the bytes into text. This is how we read streamed tokens.
+- **EventSource:** The browser's built-in SSE client. It only supports GET, so we use `fetch` for our POST chat stream instead.
+- **AbortController:** Cancels an in-flight `fetch`. It powers the Stop button and cleanup.
+- **CSS Modules:** CSS files (`X.module.css`) whose class names are scoped to one component, so styles don't clash.
+- **react-markdown:** Turns the model's Markdown answer into safe React elements, without injecting raw HTML.
+- **XSS (Cross-Site Scripting):** An attack where untrusted text is run as code in the page. This is why we never inject model output as raw HTML.
+- **ESLint / Prettier:** ESLint finds bugs and bad patterns in JS. Prettier formats code consistently. They're the frontend's equivalent of ruff.
+- **Vitest / React Testing Library / jsdom:** Vitest runs JS tests. Testing Library renders components and finds things the way a user would ("the Send button"). jsdom is a fake browser for tests.
+- **Accessibility (a11y) / `aria-live`:** Making the UI usable with keyboards and screen readers. `aria-live` announces new streamed text.
+
+## Observability
+
+- **Observability:** Being able to understand what the system did and why, from its outputs (logs, traces, metrics).
+- **Structured logging:** Logs as key/value JSON (`{"event": "retrieved", "count": 5}`) instead of free text, so they're searchable.
+- **Trace:** The full record of one request.
+- **Span:** One timed step inside a trace (e.g., "rerank": 420 ms). Spans nest like a tree.
+- **MLflow:** An open-source ML platform. We use its tracing UI (port 5000) to inspect every agent run.
+- **Request ID:** A unique ID attached to every log line and trace for one request, so you can follow it end-to-end.
+- **Latency:** How long something takes. **p95 latency** = 95% of requests are faster than this.
+
+## DevOps & tooling
+
+- **Virtual environment (venv):** A private folder of Python packages for one project, so projects don't conflict.
+- **pip / requirements.txt:** The Python package installer, and the list of exact package versions to install.
+- **Pinning:** Fixing exact versions (`fastapi==0.152.0`) so installs are reproducible.
+- **Docker image:** A packaged, read-only template of an app and everything it needs.
+- **Container:** A running instance of an image, isolated from your machine.
+- **Docker Compose:** A YAML file plus a command that start several containers together as one system.
+- **Volume:** Docker-managed storage that survives container restarts and rebuilds. Where our databases keep data.
+- **Port mapping (`8000:8000`):** Exposes a container's port on your machine so you can open it at `localhost`.
+- **Compose profile:** A label that makes some services optional (e.g., `--profile n8n`).
+- **WSL2:** Windows Subsystem for Linux. A real Linux kernel inside Windows, which Docker uses on Windows.
+- **Rancher Desktop:** An open-source app that installs and runs Docker (engine + CLI + compose) on Windows.
+- **Multi-stage build:** A Dockerfile that builds in one stage and copies only what's needed into a small final image.
+- **ruff:** A very fast Python linter + formatter.
+- **pytest:** The Python testing framework. *Unit tests* check small pieces in isolation. *Integration tests* check pieces working together (with real services).
+- **Mock / fake:** A stand-in object used in tests (e.g., a fake LLM that returns fixed answers).
+
+## Evaluation & automation (stretch)
+
+- **Faithfulness:** Whether the answer's claims are supported by the retrieved context (the opposite of hallucination).
+- **Answer relevancy:** Whether the answer actually addresses the question.
+- **Bias (in evaluation):** Unfair or stereotyped content in answers, measured with probe questions and a judge.
+- **Regression:** A change that makes quality worse than before. Evals catch it.
+- **DeepEval:** An open-source library of LLM evaluation metrics.
+- **n8n:** A visual workflow automation tool (connect triggers to actions).
+- **Webhook:** A URL that another system calls to notify you of an event.
+- **Fair-code licence:** Source is visible and free for many uses, but with restrictions, so it is not "open source" by the OSI definition. n8n uses one.
