@@ -96,3 +96,17 @@ append an entry using the template. At the start of every session, read the late
 - `.env` is never committed.
 
 **Next:** Session 1, as planned.
+
+---
+
+## Session 0d — Public README (2026-10-20)
+
+**Done:**
+- Added `README.md` for recruiters and prospective employers.
+- It covers the pitch, constraints, architecture and agent-pipeline diagrams (Mermaid), the tech stack with reasons, key design decisions, engineering practices, the roadmap with status, and skills demonstrated.
+
+**Rule:**
+- The README describes the *target* system and marks each roadmap item honestly.
+- At the end of every session, flip that session's roadmap row to ✅, and only claim features that are built and tested.
+
+**Open:** consider adding a licence (e.g. MIT) and a LinkedIn link to the Author section. Both need the owner's decision.
