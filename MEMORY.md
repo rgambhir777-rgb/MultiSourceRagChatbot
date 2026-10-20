@@ -81,3 +81,18 @@ append an entry using the template. At the start of every session, read the late
 **Open issues:** optional upgrade to Node 24 LTS (SETUP A6). The earlier open items still stand.
 
 **Next:** unchanged. Session 1 is backend-only, and the frontend starts in Session 9.
+
+---
+
+## Session 0c — Connected to GitHub (2026-10-20)
+
+**Done:**
+- Ran `git init` on branch `main` and added the remote `origin` = https://github.com/rgambhir777-rgb/MultiSourceRagChatbot
+- Added `.gitignore` (keeps out `.env`, `.venv`, `node_modules`, caches, `frontend/dist`) and `.gitattributes` (LF line endings so scripts work in Linux containers).
+- Pushed `main` to GitHub. Before pushing, the GitHub repo was empty, so nothing was overwritten.
+
+**Decisions:**
+- Each session from now on works on its own branch (`session-N`), pushes it, and merges into `main` once its Definition of Done passes.
+- `.env` is never committed.
+
+**Next:** Session 1, as planned.

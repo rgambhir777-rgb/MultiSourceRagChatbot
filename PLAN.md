@@ -187,8 +187,8 @@ Each session ≈ 2–4 hours. Every session starts with the mentor's plan and wa
 ### Session 1 — Foundations & local infrastructure
 - **Goal:** A clean project skeleton: venv, config, logging, a FastAPI app with `/health` and `/ready`, and Qdrant + Postgres + Ollama + MLflow running in Docker. `/ready` proves the API can reach each one.
 - **Files:** `pyproject.toml` (ruff/pytest config), `.gitignore`, `.dockerignore`, `docker-compose.yml` (infra services only: qdrant, postgres, ollama, mlflow + volumes + healthchecks), `app/__init__.py`, `app/config.py`, `app/logging_setup.py`, `app/main.py`, `app/api/routes_health.py`, `tests/conftest.py`, `tests/unit/test_config.py`, `tests/integration/test_ready.py`.
-- **Concepts:** virtual environments; env vars & 12-factor config; Docker images/containers/volumes/ports; healthchecks; FastAPI app factory & lifespan; structured logging; liveness vs readiness; `git init` + first commit.
-- **Definition of done:** `docker compose ps` shows 4 healthy services; `ollama pull` of both models done inside the container; `uvicorn app.main:app` runs; `GET /health` → 200; `GET /ready` → 200 with each dependency `ok`; `pytest` and `ruff check` pass; first git commit made.
+- **Concepts:** virtual environments; env vars & 12-factor config; Docker images/containers/volumes/ports; healthchecks; FastAPI app factory & lifespan; structured logging; liveness vs readiness; the git workflow (branch → commit → push → pull request into `main`).
+- **Definition of done:** `docker compose ps` shows 4 healthy services; `ollama pull` of both models done inside the container; `uvicorn app.main:app` runs; `GET /health` → 200; `GET /ready` → 200 with each dependency `ok`; `pytest` and `ruff check` pass; work committed on a `session-1` branch and pushed to GitHub.
 - **Homework:** Stop Postgres (`docker compose stop postgres`) and call `/ready` — explain what you see. Read FastAPI "First Steps" + "Settings and Environment Variables".
 
 ### Session 2 — Document loading & chunking
