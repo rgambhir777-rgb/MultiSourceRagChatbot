@@ -1,5 +1,6 @@
 # requirements.txt — pinned direct dependencies of the PYTHON BACKEND, for Python 3.12 (64-bit Windows & Linux containers).
-# Verified 2026-10-20: the whole set resolves to binary wheels for Python 3.12 / win_amd64 with no conflicts.
+# Verified 2026-10-20: the whole set resolves to binary wheels for Python 3.12 / win_amd64 with no conflicts
+# (re-verified after switching the LLM from Ollama to OpenAI).
 # Transitive dependencies are resolved by pip. Upgrade ONE package at a time, then run tests.
 # Never add a package here without the owner's approval (CLAUDE.md rule 2).
 
@@ -17,7 +18,9 @@ pydantic-settings==2.16.1        # loads .env / env vars into a typed Settings o
 langgraph==1.2.16                # agent graph: nodes, conditional edges, loops
 langgraph-checkpoint-postgres==3.2.0  # persists graph state (session memory) in Postgres
 langchain-core==1.6.12           # message types, prompt templates (used by LangGraph)
-langchain-ollama==1.1.0          # ChatOllama client with streaming + structured output
+langchain-openai==1.7.2          # ChatOpenAI client: streaming, structured outputs, token usage
+openai==3.35.1                   # official OpenAI SDK (pinned explicitly; used by langchain-openai and the /ready check)
+tiktoken==0.14.0                 # count tokens for history trimming, prompt caps and cost estimates
 langchain-text-splitters==1.1.3  # markdown-header, recursive and code-aware chunking
 
 # ---------- Retrieval ----------

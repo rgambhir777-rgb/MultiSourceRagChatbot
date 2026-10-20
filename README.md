@@ -1,6 +1,6 @@
 # MultiSource RAG Chatbot
 
-**An agentic Retrieval-Augmented Generation (RAG) chatbot that answers questions from your documents and GitHub repositories, with cited, self-checked answers. It runs entirely on a laptop CPU using only free, open-source software.**
+**An agentic Retrieval-Augmented Generation (RAG) chatbot that answers questions from your documents and GitHub repositories, with cited, self-checked answers. It uses OpenAI models for reasoning and generation on top of a fully open-source retrieval stack that runs on a laptop with no GPU.**
 
 ![Status](https://img.shields.io/badge/status-in%20development-orange)
 ![Python](https://img.shields.io/badge/backend-Python%203.12-3776AB?logo=python&logoColor=white)
@@ -8,8 +8,9 @@
 ![LangGraph](https://img.shields.io/badge/agent-LangGraph-1C3C3C)
 ![Qdrant](https://img.shields.io/badge/vector%20DB-Qdrant-DC244C)
 ![Docker](https://img.shields.io/badge/deploy-Docker%20Compose-2496ED?logo=docker&logoColor=white)
-![Open Source](https://img.shields.io/badge/stack-100%25%20open%20source-success)
-![No GPU](https://img.shields.io/badge/runs%20on-CPU%20only-lightgrey)
+![OpenAI](https://img.shields.io/badge/LLM-OpenAI-412991?logo=openai&logoColor=white)
+![Open Source](https://img.shields.io/badge/retrieval%20stack-open%20source-success)
+![No GPU](https://img.shields.io/badge/runs%20on-laptop%2C%20no%20GPU-lightgrey)
 
 > **Project status:** architecture, stack selection and the build plan are complete. Implementation is in progress, one milestone at a time. See the [Roadmap](#roadmap). This README describes the target system, and each feature is marked as built only when it's done and tested.
 
@@ -40,8 +41,9 @@ This project aims to build the version you could actually run in production, und
 
 | Constraint | Why it matters |
 |---|---|
-| **No GPU.** Must run on a 16 GB Windows laptop. | Forces careful choices on model size, latency budgets and memory, the same trade-offs teams make to control inference cost. |
-| **100% free and open source.** No paid APIs. | Data stays private, costs nothing to run, and nothing in the stack is a black box. |
+| **No GPU.** Must run on a 16 GB Windows laptop. | Embeddings, reranking and all infrastructure run locally on CPU, which forces careful choices on model size and memory. |
+| **Cost-aware LLM usage** | A paid API demands discipline: a cheap model for routing and judging, a stronger model only for the final answer, batched calls, bounded loops, token caps, and per-request cost tracking. |
+| **Open source everywhere else** | Retrieval, storage, orchestration, UI and observability are all open source, so the only external dependency is the LLM, behind one swappable client. |
 | **One-command deployment** | `docker compose up -d` brings up the entire system reproducibly. |
 | **Observable by design** | Every agent step, retrieval and LLM call is traced and can be inspected. |
 
@@ -82,7 +84,7 @@ flowchart LR
 
     ING --> QD[("Qdrant<br/>vectors + metadata")]
     RET --> QD
-    AG --> OL["Ollama<br/>local LLMs (CPU)"]
+    AG --> OL["OpenAI API<br/>gpt-6.1-sol · gpt-6-luna"]
     AG --> PG[("PostgreSQL<br/>memory checkpoints,<br/>documents, jobs")]
     ING --> PG
     API -. traces .-> ML["MLflow<br/>tracing UI"]
@@ -116,9 +118,10 @@ flowchart TD
     GC -- "unsupported again" --> UV(["⚠️ Answer marked unverified"])
 ```
 
-- **Two model sizes.** A 2B model handles the quick classification steps (route, grade, grounding check). A 4B model writes the answers. This roughly halves agent overhead on CPU.
+- **Two model tiers.** `gpt-6-luna` (small, about 20× cheaper) handles the quick classification steps: route, grade and grounding check. `gpt-6.1-sol` writes the answers. Most LLM calls per question are therefore cheap and fast.
 - **Bounded loops.** At most 2 query rewrites and 1 regeneration, so latency is predictable and the agent can't loop forever.
-- **Structured outputs.** Every decision step returns JSON validated against a schema, with safe fallbacks if a small model returns malformed output.
+- **Structured outputs.** Every decision step returns strict-schema JSON (OpenAI structured outputs) validated by Pydantic, with safe fallbacks.
+- **Cost and latency controls.** Minimal reasoning effort, max-token caps, timeouts, retries with backoff, and token usage plus estimated cost recorded for every request.
 
 ---
 
@@ -128,7 +131,7 @@ Every component was chosen against a written comparison of the alternatives. The
 
 | Layer | Technology | Why it was chosen |
 |---|---|---|
-| **LLM runtime** | [Ollama](https://ollama.com) with Qwen3.5 4B (generator) and 2B (router/judge) | Runs well on CPU, can force JSON output against a schema, private and free |
+| **LLM** | [OpenAI API](https://platform.openai.com): `gpt-6.1-sol` (generator), `gpt-6-luna` (router/judge), via `langchain-openai` | High-quality, fast answers; strict structured outputs; streaming; token-usage reporting |
 | **Agent orchestration** | [LangGraph](https://github.com/langchain-ai/langgraph) | Explicit state graph with conditional edges and cycles; built-in Postgres checkpointing |
 | **Embeddings & reranking** | [FastEmbed](https://github.com/qdrant/fastembed) (ONNX): bge-small, BM25, MiniLM cross-encoder | Fast on CPU with no PyTorch dependency; dense, sparse and reranking in one library |
 | **Vector database** | [Qdrant](https://qdrant.tech) | Native hybrid search with server-side RRF fusion, payload filtering, one lightweight container |
@@ -139,7 +142,7 @@ Every component was chosen against a written comparison of the alternatives. The
 | **Observability** | MLflow Tracing, structlog | Automatic LangGraph tracing in a single container; structured JSON logs with request IDs |
 | **Testing & quality** | pytest, Vitest, React Testing Library, Ruff, ESLint, Prettier | Unit and integration tests on both sides; strict linting and formatting |
 | **Deployment** | Docker Compose, nginx, multi-stage builds | One command; nginx serves the SPA and proxies the streamed responses |
-| **Evaluation** *(stretch)* | DeepEval + custom retrieval metrics | Faithfulness, hallucination, relevancy and bias, judged by a local model |
+| **Evaluation** *(stretch)* | DeepEval + custom retrieval metrics | Faithfulness, hallucination, relevancy and bias, judged by an LLM |
 
 ---
 
@@ -149,17 +152,18 @@ Some highlights from the [design decision log](PLAN.md#5-key-design-decisions):
 
 | Decision | Reasoning | Trade-off accepted |
 |---|---|---|
-| **Fully local LLM, no API keys** | Privacy, zero running cost, meets the open-source constraint | Slower and less capable than hosted frontier models |
+| **Hosted LLM (OpenAI), with local embeddings and reranking** | Best answer quality and latency for the LLM step, while documents are embedded and reranked locally: only the top few chunks per question are ever sent to the API | Per-token cost and an external dependency, managed with budgets, caps and retries |
+| **Two-tier model routing** | Cheap `gpt-6-luna` for classification, `gpt-6.1-sol` only for the final answer | Two model IDs to manage (both configurable) |
 | **Hybrid search + RRF instead of vectors alone** | Dense vectors miss exact tokens (IDs, error codes). BM25 misses paraphrases. RRF fuses the two by rank, so no score normalization is needed. | Two vectors per chunk (negligible storage) |
 | **Rerank 20 → 5 with a cross-encoder** | Accuracy where it matters, at bounded CPU cost | About 0.3–1 s extra per query |
-| **Batched relevance grading** | One LLM call grades all candidates instead of N calls, which matters on a CPU | Slightly less precise than grading each chunk separately |
+| **Batched relevance grading** | One LLM call grades all candidates instead of N calls: lower cost, latency and rate-limit pressure | Slightly less precise than grading each chunk separately |
 | **Stream first, verify after** | Users see tokens immediately, then a verified/unverified badge arrives | Text may be shown briefly before being flagged |
-| **MLflow instead of Langfuse for tracing** | Self-hosted Langfuse needs Postgres, ClickHouse, Redis and MinIO (about 16 GB recommended), which is too heavy alongside a local LLM. MLflow is one container. | A less specialized LLM-observability UI |
+| **MLflow instead of Langfuse for tracing** | Self-hosted Langfuse needs Postgres, ClickHouse, Redis and MinIO (about 16 GB recommended), which is too heavy for a 16 GB laptop. MLflow is one container. | A less specialized LLM-observability UI |
 | **ONNX models instead of PyTorch** | About 200 MB instead of several GB; fast and painless on Windows CPU | A smaller model catalogue |
 | **Deterministic chunk IDs + content hashing** | Re-ingesting is safe and skips unchanged files | Changing chunk settings requires a re-index |
 | **Same-origin `/api` proxy** | No CORS surface and no hard-coded hosts in the frontend | A proxy layer to configure |
 
-Risks were assessed up front, including CPU latency, a 16 GB memory budget, malformed JSON from small models, prompt injection from ingested content, and SSE buffering behind proxies. Each has a planned mitigation, documented in [PLAN.md](PLAN.md#6-risks--mitigations).
+Risks were assessed up front, including API cost runaway, key leakage, rate limits, data privacy, a 16 GB memory budget, malformed model output, prompt injection from ingested content, and SSE buffering behind proxies. Each has a planned mitigation, documented in [PLAN.md](PLAN.md#6-risks--mitigations).
 
 ---
 
@@ -229,12 +233,12 @@ The target layout, with folders added as milestones are built:
 
 > These commands work once the corresponding milestone is complete. Full Windows instructions, with a verification step for each install, are in [SETUP.md](SETUP.md).
 
-**Prerequisites:** Docker with Compose (e.g. Rancher Desktop), Python 3.12, Node.js 24 LTS. A CPU with about 16 GB of RAM is enough; no GPU is needed.
+**Prerequisites:** Docker with Compose (e.g. Rancher Desktop), Python 3.12, Node.js 24 LTS, and an **OpenAI API key** (set a project budget limit). A laptop with 8–16 GB of RAM is enough; no GPU is needed.
 
 ```bash
 git clone https://github.com/rgambhir777-rgb/MultiSourceRagChatbot.git
 cd MultiSourceRagChatbot
-cp .env.example .env
+cp .env.example .env        # then set OPENAI_API_KEY in .env
 
 # Full system (milestone 10)
 docker compose up -d --build
@@ -263,11 +267,11 @@ docker compose up -d --build
 
 ## Skills demonstrated
 
-- **AI / LLM engineering:** RAG system design, hybrid retrieval, reranking, agentic workflows with LangGraph, structured LLM outputs, LLM-as-judge, hallucination mitigation, prompt-injection defence, local model serving.
+- **AI / LLM engineering:** RAG system design, hybrid retrieval, reranking, agentic workflows with LangGraph, structured LLM outputs, LLM-as-judge, hallucination mitigation, prompt-injection defence, OpenAI API integration with cost and latency control.
 - **Backend engineering:** Python, FastAPI, async I/O, Server-Sent Events streaming, PostgreSQL, vector databases, background jobs, idempotent data pipelines.
 - **Frontend engineering:** React, custom hooks, streaming UIs over `fetch`/`ReadableStream`, accessible and XSS-safe rendering.
 - **MLOps / DevOps:** Docker Compose, multi-stage builds, nginx reverse proxy, health and readiness checks, tracing and structured logging, evaluation pipelines.
-- **Engineering judgment:** documented trade-off analysis, resource-constrained design (CPU-only, 16 GB), risk assessment, test strategy, reproducible builds.
+- **Engineering judgment:** documented trade-off analysis, resource- and cost-constrained design (no GPU, 16 GB, per-token budget), risk assessment, test strategy, reproducible builds.
 
 ---
 

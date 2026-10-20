@@ -110,3 +110,38 @@ append an entry using the template. At the start of every session, read the late
 - At the end of every session, flip that session's roadmap row to ✅, and only claim features that are built and tested.
 
 **Open:** consider adding a licence (e.g. MIT) and a LinkedIn link to the Author section. Both need the owner's decision.
+
+---
+
+## Session 0e — LLM switched to OpenAI (2026-10-20)
+
+**Decision (owner):**
+- Use the **OpenAI API** as the LLM. This is an approved exception to the "free & open source only" rule (`CLAUDE.md` rule 9).
+- Ollama and the Qwen models are removed from the stack.
+
+**Chosen models** (prices are per 1M tokens, from OpenAI's official pricing page, 2026-10-20):
+- `gpt-6.1-sol` generator, reasoning effort `low`: $2 input / $10 output.
+- `gpt-6-luna` router/grader/grounding judge, reasoning effort `none`: $0.10 input / $0.50 output.
+- Budget dev mode: `gpt-6-luna` for everything.
+
+**Estimated cost:** about $0.01–0.02 per question with the defaults. To be measured in Session 6.
+
+**Unchanged:**
+- Embeddings and reranking stay local (FastEmbed), so only the top chunks per question are sent to OpenAI.
+- The rest of the stack is unchanged.
+
+**Effects:**
+- RAM budget drops from about 9 GB to about 4 GB, and the WSL cap goes from 10 GB to 6 GB.
+- Session 1 now has 3 infra services and adds an OpenAI key check in `/ready`.
+- Session 6 now covers keys, tokens, pricing, rate limits and cost tracking.
+- 5 new risks: cost runaway, key leak, rate limits/outages, data privacy, model deprecation.
+
+**Verified:**
+- `langchain-openai==1.7.2`, `openai==3.35.1` and `tiktoken==0.14.0` resolve with the full pinned set for Python 3.12 / win_amd64, and with `deepeval` too.
+- The model IDs, prices and reasoning-effort values were confirmed on developers.openai.com.
+
+**Files updated:** CLAUDE.md, PLAN.md, SETUP.md (A5 is now OpenAI key + budget limit; A9 adds a free key check), .env.example, requirements.txt, GLOSSARY.md, README.md.
+
+**Open:**
+- The OpenAI docs page didn't explicitly confirm structured-output support for the GPT-6 models. Verify it in Session 6 with a real call.
+- The owner needs an OpenAI API key and a project budget limit before Session 1 (SETUP A5).

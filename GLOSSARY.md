@@ -6,17 +6,25 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 
 - **LLM (Large Language Model):** A model trained to predict the next piece of text. Given a prompt, it generates a continuation (an answer).
 - **Parameters (e.g., "4B"):** The model's learned numbers. 4B = 4 billion. More parameters usually means smarter, but also slower and more RAM.
-- **Quantization (Q4, Q8):** Storing the parameters with fewer bits so the model fits in less RAM and runs faster, with a small quality loss. Ollama models default to ~4-bit.
+- **Quantization (Q4, Q8):** Storing the parameters with fewer bits so the model fits in less RAM and runs faster, with a small quality loss. (Relevant to local models; OpenAI handles this for us.)
 - **Token:** A chunk of text the model reads or writes (≈ ¾ of an English word). Speed is measured in tokens/second.
 - **Context window (`num_ctx`):** The maximum number of tokens the model can "see" at once: system prompt, history, retrieved chunks and the answer together.
 - **Prompt / system prompt:** The text we send to the model. The *system* prompt sets the rules ("answer only from the context").
 - **Temperature:** The randomness of the output. Low (0–0.2) = focused and repeatable, which is good for RAG and judging.
-- **Inference:** Running a trained model to get an output. We do inference on CPU.
+- **Inference:** Running a trained model to get an output. Our LLM inference happens on OpenAI's servers. Embeddings and reranking run locally on CPU.
 - **Hallucination:** The model states something that sounds plausible but isn't supported by facts or the provided context.
-- **Thinking / reasoning mode:** Some models write hidden "thoughts" before answering. Better on hard problems, but much slower on a CPU, so we turn it off.
+- **Thinking / reasoning mode:** Some models write hidden "thoughts" before answering. Better on hard problems, but slower, and you pay for those hidden tokens.
+- **Reasoning effort:** An OpenAI setting (`none`, `low`, `medium`, `high` …) that controls how much hidden reasoning a model does. We use `none` for the judge and `low` for the generator.
 - **Structured output:** Forcing the model to reply in a fixed JSON shape (a schema) so code can read it reliably.
 - **LLM-as-judge:** Using an LLM to evaluate something (Is this chunk relevant? Is this answer grounded?).
-- **Ollama:** The local program that downloads and runs LLMs and exposes them over HTTP at port 11434.
+- **OpenAI API:** OpenAI's paid web service for its models. Our backend sends it messages over HTTPS and gets answers (streamed) back.
+- **API key:** A secret password that identifies your account to an API, which then bills that account. Keep it in `.env`, never in code or git.
+- **OpenAI project / budget limit:** A project groups keys and usage. A monthly budget limit stops spending at a set amount, as a safety net.
+- **Input / output tokens & pricing:** You pay per token sent (input: prompt, history, chunks) and per token generated (output), priced per 1 million tokens. Output costs more.
+- **Rate limit (HTTP 429):** The API refusing requests because you sent too many too fast, or ran out of credit. We retry with backoff.
+- **Exponential backoff:** Waiting longer after each failed retry (1 s, 2 s, 4 s…) so you don't hammer a struggling service.
+- **tiktoken:** OpenAI's tokenizer library. It counts tokens before sending, for cost estimates and to keep prompts under our cap.
+- **Ollama:** A program for running open LLMs locally. It was considered for this project and replaced by the OpenAI API.
 
 ## RAG & retrieval
 

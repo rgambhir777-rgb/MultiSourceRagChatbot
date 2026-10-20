@@ -34,10 +34,10 @@
                                │  └────────┬──────────────┬───────────────┬──────────────┬─────────┘
                                │           ▼              ▼               ▼              ▼
                                │   ┌────────────┐ ┌──────────────┐ ┌────────────┐ ┌────────────┐
-                               │   │  Qdrant    │ │  PostgreSQL  │ │  Ollama    │ │  MLflow    │
-                               │   │  :6333     │ │  :5432       │ │  :11434    │ │  :5000     │
-                               │   │ vectors +  │ │ docs, jobs,  │ │ qwen3.5:4b │ │ traces of  │
-                               │   │ payloads   │ │ sessions,    │ │ qwen3.5:2b │ │ every node,│
+                               │   │  Qdrant    │ │  PostgreSQL  │ │ OpenAI API │ │  MLflow    │
+                               │   │  :6333     │ │  :5432       │ │ (external) │ │  :5000     │
+                               │   │ vectors +  │ │ docs, jobs,  │ │ gpt-6.1-sol│ │ traces of  │
+                               │   │ payloads   │ │ sessions,    │ │ gpt-6-luna │ │ every node,│
                                │   │            │ │ checkpoints  │ │            │ │ LLM call   │
                                │   └────────────┘ └──────────────┘ └────────────┘ └────────────┘
                                │        all data on named Docker volumes (survive restarts)    │
@@ -54,11 +54,11 @@ the browser only ever talks to one origin, no CORS setup is needed.
 
 1. The React UI sends `POST /api/chat` with `session_id` + `message`. nginx (or the Vite proxy) forwards it to the API, which opens an SSE stream. React reads the stream with `fetch`, because `EventSource` can't send POST requests.
 2. LangGraph loads that session's previous state from Postgres (the *checkpointer*).
-3. **route** (small model) decides: does this need the knowledge base, or can it be answered directly (greeting, follow-up about the conversation itself)?
+3. **route** (fast model, `gpt-6-luna`) decides: does this need the knowledge base, or can it be answered directly (greeting, follow-up about the conversation itself)?
 4. **retrieve**: hybrid search in Qdrant (dense + BM25 → RRF) gets 20 candidates; the cross-encoder **reranks** to the best 5.
-5. **grade** (small model, one batched call) keeps only chunks that actually help answer the question.
+5. **grade** (fast model, one batched call) keeps only chunks that actually help answer the question.
 6. If nothing relevant → **rewrite** the query (max 2 times) and retrieve again; if still nothing → honest "I couldn't find this in your documents."
-7. **generate** (4B model) writes the answer with `[1]`-style citations; tokens stream to the UI live.
+7. **generate** (`gpt-6.1-sol`) writes the answer with `[1]`-style citations; tokens stream to the UI live.
 8. **grounding check** verifies every claim is supported by the chunks. Fail → regenerate once with a stricter prompt; still failing → answer is marked *unverified* in the UI.
 9. The final state is checkpointed to Postgres; the whole run is one trace in MLflow.
 
@@ -68,9 +68,10 @@ the browser only ever talks to one origin, no CORS setup is needed.
 
 | Component | What it is | Why it exists here |
 |---|---|---|
-| **Ollama** | A local server that runs open LLMs on your CPU and exposes a simple HTTP API. | Free, private, no API keys. Our "brain". |
-| **qwen3.5:4b** | A 4-billion-parameter instruction model (~3.4 GB RAM at Q4). | Big enough to write good grounded answers; small enough for a laptop CPU. |
-| **qwen3.5:2b** | A 2B sibling (~1.9 GB). | Routing/grading are simple yes/no decisions: a smaller model is ~2× faster and good enough. Saves seconds per message. |
+| **OpenAI API** | OpenAI's hosted LLMs, called over HTTPS with an API key and billed per token. | Owner decision: strong answer quality and fast responses (seconds, not tens of seconds), with no model to run on the laptop. Our "brain". |
+| **gpt-6.1-sol** | OpenAI's mid-tier reasoning model ($2 in / $10 out per 1M tokens, Oct 2026). | Writes the final grounded answers with citations. Reasoning effort is set to `low` for speed. |
+| **gpt-6-luna** | OpenAI's small, fast, cheap model ($0.10 in / $0.50 out per 1M tokens). | Routing, grading and grounding checks are simple classifications. At 20× cheaper than Sol, with reasoning set to `none`, it keeps each message's overhead tiny. |
+| **langchain-openai** | The LangChain/LangGraph client for OpenAI models. | Streaming, structured outputs (JSON schema) and token-usage reporting, plus automatic tracing in MLflow. |
 | **LangGraph** | A library for building agents as a *graph*: nodes (steps) + edges (what runs next, including loops). | Our loop has branches and retries; a graph makes that explicit, testable, traceable, and gives us persistent memory for free via checkpointers. |
 | **FastEmbed** | Runs embedding / reranking models with ONNX Runtime (no PyTorch). | CPU-fast, ~200 MB instead of multi-GB torch installs; painless on Windows. |
 | **Dense embeddings** (bge-small, 384-dim) | Turn text into vectors where similar *meaning* ⇒ nearby vectors. | Finds paraphrases ("car" ≈ "vehicle"). |
@@ -136,7 +137,7 @@ the browser only ever talks to one origin, no CORS setup is needed.
 │   │   ├── reranker.py            # cross-encoder rerank
 │   │   └── retriever.py           # retrieve(query) → reranked chunks
 │   ├── agent/
-│   │   ├── llm.py                 # ChatOllama factories (generator / judge)
+│   │   ├── llm.py                 # ChatOpenAI factories (generator / judge), token + cost accounting
 │   │   ├── prompts.py             # every prompt template
 │   │   ├── state.py               # AgentState TypedDict + structured-output schemas
 │   │   ├── nodes.py               # route, retrieve, grade, rewrite, generate, grounding
@@ -185,10 +186,10 @@ Each session ≈ 2–4 hours. Every session starts with the mentor's plan and wa
 (see `CLAUDE.md` §6).
 
 ### Session 1 — Foundations & local infrastructure
-- **Goal:** A clean project skeleton: venv, config, logging, a FastAPI app with `/health` and `/ready`, and Qdrant + Postgres + Ollama + MLflow running in Docker. `/ready` proves the API can reach each one.
-- **Files:** `pyproject.toml` (ruff/pytest config), `.gitignore`, `.dockerignore`, `docker-compose.yml` (infra services only: qdrant, postgres, ollama, mlflow + volumes + healthchecks), `app/__init__.py`, `app/config.py`, `app/logging_setup.py`, `app/main.py`, `app/api/routes_health.py`, `tests/conftest.py`, `tests/unit/test_config.py`, `tests/integration/test_ready.py`.
+- **Goal:** A clean project skeleton: venv, config, logging, a FastAPI app with `/health` and `/ready`, and Qdrant + Postgres + MLflow running in Docker. `/ready` proves the API can reach each one, and that the OpenAI API key works (a free models lookup, not a paid completion).
+- **Files:** `pyproject.toml` (ruff/pytest config), `.gitignore`, `.dockerignore`, `docker-compose.yml` (infra services only: qdrant, postgres, mlflow + volumes + healthchecks), `app/__init__.py`, `app/config.py`, `app/logging_setup.py`, `app/main.py`, `app/api/routes_health.py`, `tests/conftest.py`, `tests/unit/test_config.py`, `tests/integration/test_ready.py`.
 - **Concepts:** virtual environments; env vars & 12-factor config; Docker images/containers/volumes/ports; healthchecks; FastAPI app factory & lifespan; structured logging; liveness vs readiness; the git workflow (branch → commit → push → pull request into `main`).
-- **Definition of done:** `docker compose ps` shows 4 healthy services; `ollama pull` of both models done inside the container; `uvicorn app.main:app` runs; `GET /health` → 200; `GET /ready` → 200 with each dependency `ok`; `pytest` and `ruff check` pass; work committed on a `session-1` branch and pushed to GitHub.
+- **Definition of done:** `docker compose ps` shows 3 healthy services; `OPENAI_API_KEY` loaded from `.env` (never committed); `uvicorn app.main:app` runs; `GET /health` → 200; `GET /ready` → 200 with each dependency `ok`; `pytest` and `ruff check` pass; work committed on a `session-1` branch and pushed to GitHub.
 - **Homework:** Stop Postgres (`docker compose stop postgres`) and call `/ready` — explain what you see. Read FastAPI "First Steps" + "Settings and Environment Variables".
 
 ### Session 2 — Document loading & chunking
@@ -220,16 +221,16 @@ Each session ≈ 2–4 hours. Every session starts with the mentor's plan and wa
 - **Homework:** Ingest a small repo you know. Ask yourself 3 questions about it and check (via the retrieval CLI) whether the right files come back.
 
 ### Session 6 — LLM, baseline RAG & tracing
-- **Goal:** Connect Ollama; build a simple *non-agentic* RAG answer (retrieve → generate with citations) as a baseline; trace everything in MLflow.
+- **Goal:** Connect to the OpenAI API; build a simple *non-agentic* RAG answer (retrieve → generate with citations) as a baseline; trace everything in MLflow.
 - **Files:** `app/agent/llm.py`, `app/agent/prompts.py`, `app/observability/tracing.py`, a temporary `/chat/simple` route, `tests/unit/test_prompts.py`.
-- **Concepts:** chat messages & roles; system prompts; context window & `num_ctx`; temperature; citations; "answer only from context" + prompt-injection defence; disabling "thinking" for speed; traces & spans; latency budgets on CPU.
-- **Definition of done:** `/chat/simple` answers a sample-doc question with correct `[n]` citations; the MLflow UI (`localhost:5000`) shows one trace per request with retrieval and LLM spans, inputs, outputs and timings; measured tokens/sec recorded in `MEMORY.md`.
+- **Concepts:** API keys & secrets handling; chat messages & roles; system prompts; tokens, context windows & per-token pricing; reasoning effort; max output tokens; citations; "answer only from context" + prompt-injection defence; timeouts, retries with backoff & rate limits (HTTP 429); traces & spans; cost and latency budgets.
+- **Definition of done:** `/chat/simple` answers a sample-doc question with correct `[n]` citations; the MLflow UI (`localhost:5000`) shows one trace per request with retrieval and LLM spans, inputs, outputs, timings and token usage; measured latency and **cost per question** recorded in `MEMORY.md`; an OpenAI project spending limit is set.
 - **Homework:** Ask a question your docs *can't* answer. Does it refuse or make something up? Save the trace link. Session 7 fixes this problem. **React prep (30–45 min):** react.dev → "Quick Start" and "Tutorial: Tic-Tac-Toe".
 
 ### Session 7 — The agentic loop (LangGraph)
 - **Goal:** Replace the baseline with the full graph: route → retrieve → grade → rewrite → generate → grounding check, with bounded retries.
 - **Files:** `app/agent/state.py`, `app/agent/nodes.py`, `app/agent/graph.py`, prompt additions, `tests/unit/test_nodes.py` (LLM mocked), `tests/unit/test_graph_paths.py`.
-- **Concepts:** state machines; LangGraph `StateGraph`, nodes, conditional edges, reducers; structured outputs with Pydantic + Ollama JSON schema; LLM-as-judge; loop guards; fallbacks when the model returns junk; testing agents with fake LLMs.
+- **Concepts:** state machines; LangGraph `StateGraph`, nodes, conditional edges, reducers; structured outputs with Pydantic + OpenAI JSON-schema structured outputs; LLM-as-judge; loop guards; fallbacks when the model returns junk; testing agents with fake LLMs.
 - **Definition of done:** unit tests cover all 4 paths (direct, normal RAG, rewrite-then-answer, give-up-honestly) with a fake LLM; the Session 6 "unanswerable" question now gets an honest refusal; MLflow trace shows each node; graph diagram exported (`graph.get_graph().draw_mermaid()`) into `PLAN.md`.
 - **Homework:** Draw the graph on paper from memory. Then find in the trace where the grader removed an irrelevant chunk. **React prep:** react.dev → "Thinking in React" and "Describing the UI".
 
@@ -259,11 +260,11 @@ Each session ≈ 2–4 hours. Every session starts with the mentor's plan and wa
 - **Homework:** Open browser DevTools → Network, ask one question, and identify each SSE event in the stream. Show the app to someone non-technical and write down the first 3 things that confused them.
 
 ### Session 10 — One-command deployment & hardening
-- **Goal:** `docker compose up -d` starts the *entire* system (api, frontend, qdrant, postgres, ollama, mlflow) from a clean machine, with production basics in place.
-- **Files:** `docker/api.Dockerfile`, `docker/frontend.Dockerfile` (stage 1 `node:24.22.0-alpine` runs `npm ci && npm run build`; stage 2 `nginx:1.30.6-alpine` serves `dist/`), `frontend/nginx.conf` (SPA fallback, `/api` proxy with `proxy_buffering off`, long read timeout, security headers), `docker/postgres-init.sql`, final `docker-compose.yml` (healthchecks, `depends_on: condition: service_healthy`, restart policies, memory limits, model-pull init job), `README.md` (owner-approved), `tests/integration/test_smoke.py`.
-- **Concepts:** multi-stage builds & slim images; serving a React build behind a reverse proxy; non-root containers; `npm audit`; baking embedding models into the image; service dependency ordering; resource limits on a 16 GB laptop; secrets via env; backups of volumes; what "production-credible" means (and what's still missing: auth, TLS, scaling).
-- **Definition of done:** `docker compose down -v` then `docker compose up -d` → all services healthy. The app at `localhost:8080` works end-to-end, and tokens arrive progressively through nginx rather than all at once. The smoke test (ingest sample docs → ask → streamed, cited, grounded answer) passes against the containers; restart survives with memory + index intact; total RAM within budget (≈ ≤ 9 GB).
-- **Homework:** Write in your own words, in `MEMORY.md`, how a message travels from the browser to Ollama and back.
+- **Goal:** `docker compose up -d` starts the *entire* system (api, frontend, qdrant, postgres, mlflow) from a clean machine, with production basics in place.
+- **Files:** `docker/api.Dockerfile`, `docker/frontend.Dockerfile` (stage 1 `node:24.22.0-alpine` runs `npm ci && npm run build`; stage 2 `nginx:1.30.6-alpine` serves `dist/`), `frontend/nginx.conf` (SPA fallback, `/api` proxy with `proxy_buffering off`, long read timeout, security headers), `docker/postgres-init.sql`, final `docker-compose.yml` (healthchecks, `depends_on: condition: service_healthy`, restart policies, memory limits), `README.md` (owner-approved), `tests/integration/test_smoke.py`.
+- **Concepts:** multi-stage builds & slim images; serving a React build behind a reverse proxy; non-root containers; `npm audit`; baking embedding models into the image; service dependency ordering; resource limits on a 16 GB laptop; secrets via env (the OpenAI key is injected at runtime, never baked into an image); backups of volumes; what "production-credible" means (and what's still missing: auth, TLS, scaling).
+- **Definition of done:** `docker compose down -v` then `docker compose up -d` → all services healthy. The app at `localhost:8080` works end-to-end, and tokens arrive progressively through nginx rather than all at once. The smoke test (ingest sample docs → ask → streamed, cited, grounded answer) passes against the containers; restart survives with memory + index intact; total RAM within budget (≈ ≤ 4 GB).
+- **Homework:** Write in your own words, in `MEMORY.md`, how a message travels from the browser to OpenAI and back, and what each hop costs in time and money.
 
 ### Stretch A — Evaluation: hallucination, accuracy, bias
 - **Goal:** Automated quality report. Retrieval metrics (from Session 4) + DeepEval LLM-judge metrics (faithfulness, hallucination, answer relevancy, bias) on the golden set; results logged to MLflow as an experiment run so changes can be compared.
@@ -284,17 +285,17 @@ Each session ≈ 2–4 hours. Every session starts with the mentor's plan and wa
 
 | # | Decision | Why | Trade-off accepted |
 |---|---|---|---|
-| D1 | **Fully local LLM via Ollama**, no API keys | Free, private, meets the rules | Slower & less capable than hosted frontier models (expect ~5–15 s/answer on CPU) |
-| D2 | **Two model sizes** (2B judge/router, 4B generator) | Most agent steps are classification; small model halves their latency | Two models in RAM (~5.5 GB); configurable to use one |
-| D3 | **Disable "thinking" mode** on Qwen | Thinking tokens on CPU can add 30+ s | Slightly weaker reasoning on hard questions |
+| D1 | **OpenAI API for the LLM** (owner decision, 2026-10-20; replaces local Ollama) | Much better answer quality and speed (~2–6 s per answer) than a CPU-only local model; frees ~5.5 GB RAM; simpler deployment | **Paid** (≈ $0.01–0.02 per question, see risks); needs an API key; questions + retrieved chunks are sent to OpenAI; depends on an external service |
+| D2 | **Two model tiers**: `gpt-6-luna` (router/grader/grounding judge) + `gpt-6.1-sol` (generator) | Most agent steps are classification; the small tier is 20× cheaper and faster | Two model IDs to manage; both are just `.env` settings, so either can be swapped or one used for everything |
+| D3 | **Minimal reasoning effort** (`none` for the judge, `low` for the generator) | Reasoning tokens cost money and add latency; grounded RAG answers rarely need deep reasoning | Slightly weaker on complex multi-step questions; raise via `.env` if needed |
 | D4 | **FastEmbed/ONNX instead of PyTorch** | Small install, fast on CPU, no Windows torch pain | Fewer model choices than sentence-transformers |
 | D5 | **Hybrid search + RRF inside Qdrant** | One query, no score normalisation code, robust | Need two vectors per chunk (more storage — trivial here) |
 | D6 | **Rerank top-20 → top-5** | Precision where it matters, bounded CPU cost | +0.3–1 s per query |
-| D7 | **Batched grading** (one LLM call grades all 5 chunks) | 1 call instead of 5 on CPU | Slightly less reliable than per-chunk grading |
+| D7 | **Batched grading** (one LLM call grades all 5 chunks) | 1 call instead of 5: less cost, latency and rate-limit pressure | Slightly less reliable than per-chunk grading |
 | D8 | **Bounded loops** (max 2 rewrites, 1 regeneration) | Prevents runaway latency and infinite loops | Some hard questions end in "not found" |
-| D9 | **Stream first, verify after**: tokens stream live; grounding verdict arrives as a final event; UI shows *verified/unverified* badge | Good UX on slow hardware; honest | User may briefly read text that later gets an *unverified* badge |
+| D9 | **Stream first, verify after**: tokens stream live; grounding verdict arrives as a final event; UI shows *verified/unverified* badge | Fast perceived response; honest | User may briefly read text that later gets an *unverified* badge |
 | D10 | **Postgres for memory (LangGraph checkpointer)** + app tables | One durable DB; survives restarts; standard | One more container than SQLite would need |
-| D11 | **MLflow Tracing instead of Langfuse** | Langfuse v3 self-host needs Postgres+ClickHouse+Redis+MinIO (~16 GB recommended) — too heavy beside a local LLM on 16 GB. MLflow: one container, Apache-2.0, LangGraph autolog | Less polished LLM-specific UI than Langfuse; upgrade path exists via OpenTelemetry |
+| D11 | **MLflow Tracing instead of Langfuse** | Langfuse v3 self-host needs Postgres+ClickHouse+Redis+MinIO (~16 GB recommended) — too heavy for a 16 GB laptop. MLflow: one container, Apache-2.0, LangGraph autolog | Less polished LLM-specific UI than Langfuse; upgrade path exists via OpenTelemetry |
 | D12 | **MLflow server uses SQLite on a volume** (not Postgres) | Stock image, no extra DB driver or second database to manage; SQLite is fine for one user | Not for multi-user scale |
 | D13 | **React SPA (built by Vite, served by nginx) that only talks HTTP under `/api`** (owner decision, replaces Streamlit) | Industry-standard frontend with full UX control. Vite is the current standard React build tool (Create React App is deprecated). The same-origin `/api` proxy means no CORS setup and no hard-coded hosts. The backend stays reusable by n8n and curl | A second language and toolchain (Node/npm) to learn; more code than Streamlit |
 | D14 | **MarkItDown → Markdown → header-aware chunks** | One parser for all formats, structure preserved | No OCR: scanned PDFs yield little text (flagged per document) |
@@ -312,9 +313,14 @@ Each session ≈ 2–4 hours. Every session starts with the mentor's plan and wa
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| **CPU latency** (agent = 3–5 LLM calls) | Slow answers (10–30 s) | Small judge model, thinking off, batched grading, `num_ctx` 8192, bounded loops, streaming + progress events, keep models loaded (`OLLAMA_KEEP_ALIVE`) |
-| **RAM pressure** (16 GB total) | Swapping, crashes | Budget: Ollama ~5.5 GB, API ~1 GB, others ~1.5 GB; WSL memory cap via `.wslconfig`; compose memory limits; never run native Ollama *and* container Ollama at the same time with models loaded |
-| **Small models return invalid JSON** | Router/grader/grounding crash | Ollama `format=<JSON schema>`, Pydantic validation, 1 retry, safe default (e.g., treat as "relevant" / "unverified") |
+| **API cost runaway** (agent = 3–5 LLM calls per question; loops; bugs) | Unexpected bill | OpenAI project **monthly budget limit**; cheap judge model; batched grading; bounded loops; `LLM_MAX_OUTPUT_TOKENS` + prompt-size cap; token usage + estimated cost logged per request and visible in traces; unit tests use a fake LLM (zero cost) |
+| **API key leak** | Others spend your money | Key only in `.env` (git-ignored) / container env at runtime; never logged, never sent to the frontend; use a dedicated OpenAI *project* key you can revoke |
+| **Rate limits (429), timeouts, outages** | Failed or slow answers | Timeouts on every call, retries with exponential backoff (SDK + tenacity), clear `error` SSE event to the UI, `/ready` reports OpenAI status |
+| **Data privacy** | Questions and retrieved chunks leave the laptop | Documented clearly; don't ingest confidential data; embeddings/reranking stay local, so whole documents are never uploaded, only the top chunks per question |
+| **Model renames/deprecations** | Calls start failing | Model IDs only in `.env`; pinned SDK; integration test hits each configured model |
+| **Latency** (agent = 3–5 LLM calls) | 3–8 s answers | Fast judge model, minimal reasoning, batched grading, bounded loops, streaming + progress events |
+| **RAM pressure** (16 GB total) | Swapping, crashes | Much lower without a local LLM: budget ≈ API ~1 GB, others ~1.5 GB; WSL memory cap via `.wslconfig`; compose memory limits |
+| **Model returns invalid JSON** | Router/grader/grounding crash | OpenAI structured outputs (strict JSON schema), Pydantic validation, 1 retry, safe default (e.g., treat as "relevant" / "unverified") |
 | **psycopg async on Windows** (needs selector event loop; Uvicorn on Windows uses Proactor) | Memory/DB errors in local dev | Set `WindowsSelectorEventLoopPolicy` in the dev entrypoint; containers (Linux) are unaffected — addressed in Session 8 |
 | **Python 3.14 is your default** | Some wheels missing/behaviour changes | Use a dedicated Python 3.12 venv (SETUP.md) |
 | **Prompt injection** from ingested docs/repos | Model follows malicious instructions in content | Context wrapped in delimiters + "content is data, not instructions" system prompt; never execute repo code; grounding check |
@@ -334,22 +340,39 @@ Each session ≈ 2–4 hours. Every session starts with the mentor's plan and wa
 ## Appendix — Stack comparison tables
 
 Rules applied: free & OSS · pip or docker compose · Windows laptop, no GPU · simplest production-credible · actively maintained.
+**Exception (owner decision, 2026-10-20):** the LLM is OpenAI's paid API. Everything else remains free and open source.
 
-**LLM runtime**
+**LLM provider** (owner decision: OpenAI)
+
+| Option | Cost | Quality / speed | Notes |
+|---|---|---|---|
+| **OpenAI API** ✅ | Paid per token | High quality, ~2–6 s answers | Owner's choice; structured outputs, streaming, usage reporting |
+| Ollama (local, original pick) | Free | Smaller models, 10–30 s on this CPU | Documented fallback: it has an OpenAI-compatible endpoint, so `OPENAI_BASE_URL` could point at it later (ask first) |
+
+*Original local-runtime comparison (kept for reference):*
 
 | Option | CPU-friendly | Setup on Windows | API | Notes |
 |---|---|---|---|---|
-| **Ollama** ✅ | Yes (llama.cpp inside) | Installer or one container | REST + OpenAI-compatible | Biggest model library, JSON-schema outputs |
+| Ollama | Yes (llama.cpp inside) | Installer or one container | REST + OpenAI-compatible | Biggest model library, JSON-schema outputs |
 | llama.cpp server | Yes | Manual builds/flags | OpenAI-compatible | More knobs, more friction |
 | LocalAI | Yes | Container | OpenAI-compatible | Heavier, more moving parts |
 | vLLM | Poor without GPU | Linux-centric | OpenAI-compatible | Built for GPUs |
 
-**LLM model (CPU, ≤ ~4 GB RAM)**
+**OpenAI model** (prices per 1M tokens, standard tier, from OpenAI's pricing page, Oct 2026)
+
+| Option | Input / output | Role here | Notes |
+|---|---|---|---|
+| **gpt-6.1-sol** ✅ (generator) | $2 / $10 | Writes answers | Mid tier; reasoning effort `low` |
+| **gpt-6-luna** ✅ (judge/router) | $0.10 / $0.50 | Route, grade, grounding | Small tier; supports reasoning effort `none` |
+| gpt-6-astra | $10 / $50 | — | Flagship; 5× Sol's cost, unnecessary for grounded RAG |
+| gpt-6-luna for everything | $0.10 / $0.50 | Budget mode | Cheapest for development: set `LLM_GENERATOR_MODEL=gpt-6-luna` |
+
+*Original local-model comparison (kept for reference):*
 
 | Option | Size | Strength | Notes |
 |---|---|---|---|
-| **qwen3.5:4b** ✅ (generator) | ~3.4 GB | Strong instruction following/JSON for size | Current-gen; thinking can be disabled |
-| **qwen3.5:2b** ✅ (judge) | ~1.9 GB | Fast classification | Good enough for route/grade |
+| qwen3.5:4b | ~3.4 GB | Strong instruction following/JSON for size | Current-gen; thinking can be disabled |
+| qwen3.5:2b | ~1.9 GB | Fast classification | Good enough for route/grade |
 | qwen3:8b (you have it) | 5.2 GB | Better answers | ~2× slower on your CPU; can swap in via `.env` |
 | llama3.2:3b | 2.0 GB | Solid, older | Weaker structured output than Qwen3.5 |
 | gemma4:31b (you have it) | 20 GB | Strong | Won't fit in 16 GB RAM — do not use |
@@ -458,7 +481,7 @@ Rules applied: free & OSS · pip or docker compose · Windows laptop, no GPU · 
 
 **Evaluation (stretch)**
 
-| Option | Hallucination/faithfulness | Bias | Local judge (Ollama) | Licence |
+| Option | Hallucination/faithfulness | Bias | OpenAI judge | Licence |
 |---|---|---|---|---|
 | **DeepEval** ✅ | Yes | Yes (BiasMetric) | Yes | Apache-2.0 |
 | Ragas | Yes | No built-in | Yes (via wrappers) | Apache-2.0 |

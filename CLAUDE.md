@@ -42,6 +42,9 @@ code readable, and never skip the concept behind a change.
    committed). Only `.env.example` is committed.
 9. **Free and open source only**, installable via `pip` (backend), `npm` (frontend) or
    `docker compose`, runnable on a Windows laptop with **no GPU** (16 GB RAM, Intel Core 7 150U).
+   **One approved exception (owner decision, 2026-10-20): the LLM is OpenAI's paid API.** Do not add any
+   other paid service, and do not switch OpenAI models or raise reasoning effort / token limits without asking,
+   because those change the bill.
 10. **Backend is Python, frontend is React (JavaScript).** Do not propose other languages or
     frameworks for either side.
 
@@ -51,10 +54,11 @@ code readable, and never skip the concept behind a change.
 |---|---|---|---|
 | Backend language | Python | 3.12 (venv) | PSF |
 | Frontend language / runtime | JavaScript (ES modules + JSX) on Node.js LTS | Node 24 LTS (22 also works) | MIT |
-| LLM runtime | Ollama | image `ollama/ollama:0.40.6` | MIT |
-| Generator model | `qwen3.5:4b` (thinking disabled) | — | Apache-2.0 |
-| Router / grader model | `qwen3.5:2b` | — | Apache-2.0 |
-| Agent orchestration | LangGraph (+ langchain-core, langchain-ollama) | 1.2.16 | MIT |
+| LLM provider | **OpenAI API** (paid, owner-approved) via `openai` SDK + `langchain-openai` | 3.35.1 / 1.7.2 | Proprietary service; SDKs Apache-2.0 / MIT |
+| Generator model | `gpt-6.1-sol`, reasoning effort `low` ($2 / $10 per 1M tokens in/out) | — | — |
+| Router / grader / grounding model | `gpt-6-luna`, reasoning effort `none` ($0.10 / $0.50 per 1M tokens) | — | — |
+| Token counting | tiktoken (history trimming, cost estimates) | 0.14.0 | MIT |
+| Agent orchestration | LangGraph (+ langchain-core, langchain-openai) | 1.2.16 | MIT |
 | Embeddings (dense) | FastEmbed `BAAI/bge-small-en-v1.5` (ONNX, CPU) | fastembed 0.9.0 | Apache-2.0 / MIT |
 | Embeddings (sparse) | FastEmbed `Qdrant/bm25` | fastembed 0.9.0 | Apache-2.0 |
 | Reranker | FastEmbed cross-encoder `Xenova/ms-marco-MiniLM-L-6-v2` | fastembed 0.9.0 | Apache-2.0 |
@@ -117,7 +121,7 @@ Folders are created in the session that needs them (see `PLAN.md`), not up front
 └── tests/                     # unit/ and integration/ tests mirroring app/
 ```
 
-Dependency direction: `api → agent → retrieval → (qdrant, embeddings)`; `api → ingestion → retrieval`.
+Dependency direction: `api → agent → (retrieval → (qdrant, embeddings), llm → OpenAI)`; `api → ingestion → retrieval`.
 `frontend` never imports `app`; it only calls the HTTP API.
 All backend routes live under the `/api` prefix (health checks `/health`, `/ready` excepted). The frontend uses the
 relative path `/api`: the Vite dev proxy forwards it in development and nginx forwards it in production, so
@@ -134,7 +138,12 @@ no CORS configuration and no hard-coded hostnames are needed.
 - **Small, single-purpose functions** (aim < 40 lines). Module docstring at top of every file explaining its role in plain English. Docstrings on public functions. Comments explain *why*, not *what*.
 - **Async in the API layer** (FastAPI routes, streaming). CPU-bound work (embedding, reranking, parsing) runs in a thread (`anyio.to_thread.run_sync` / `run_in_threadpool`) so it doesn't block the event loop.
 - **Every network call has a timeout**; retries (tenacity) only for idempotent calls, with backoff.
-- **LLM calls return structured output** (Pydantic schema via Ollama `format`) wherever the result drives control flow (route, grade, grounding). Always have a safe fallback if parsing fails.
+- **LLM calls return structured output** (Pydantic schema via OpenAI structured outputs, `with_structured_output(..., strict=True)`) wherever the result drives control flow (route, grade, grounding). Always have a safe fallback if parsing fails.
+- **OpenAI usage rules:**
+  - Only `app/agent/llm.py` creates model clients. Model IDs, reasoning effort, max output tokens, timeout and retries all come from Settings.
+  - Every call sets a timeout and a max output token cap.
+  - Log token usage and estimated cost per request, never the API key.
+  - Unit tests use a fake LLM and must never call the real API. Real-API tests are marked `@pytest.mark.openai` and run only on demand.
 - **Bounded loops.** Every agent loop has a max-iterations setting (rewrites, regenerations).
 - **Prompts live in `app/agent/prompts.py`**, never inline in node code.
 - **Naming:** `snake_case` functions/vars/modules, `PascalCase` classes, `UPPER_SNAKE` constants. Files named for what they contain (`reranker.py`, not `utils2.py`).
