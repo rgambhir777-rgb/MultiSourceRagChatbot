@@ -1,0 +1,11 @@
+# Store text files with LF line endings so scripts and Dockerfiles work inside Linux containers.
+* text=auto eol=lf
+# Windows-only scripts keep CRLF.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+# Binary files: never touch.
+*.pdf binary
+*.docx binary
+*.png binary
+*.jpg binary
