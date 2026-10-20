@@ -180,10 +180,27 @@ the browser only ever talks to one origin, no CORS setup is needed.
 
 ---
 
-## 4. Build sessions
+## 4. Build phases & sessions
+
+The 10 sessions are grouped into **7 phases**. Each phase ends with a **milestone you can demo**, and is merged into
+`main` only when all of its sessions' Definitions of Done pass. A phase = one or two sessions, one branch per session.
+
+| Phase | Name | Sessions | Milestone (what you can show at the end) |
+|---|---|---|---|
+| **1** | **Foundation** | 1 | Infra running in Docker; API answers `/health` and `/ready` (Qdrant, Postgres, MLflow, OpenAI key all `ok`); tests + lint green |
+| **2** | **Knowledge pipeline** | 2, 3 | `python -m app.cli ingest data/sample_docs` → documents parsed, chunked, embedded and visible in Qdrant; re-ingest is skipped |
+| **3** | **Retrieval & sources** | 4, 5 | Measured hybrid + rerank retrieval (hit@5, MRR table); GitHub repos and file uploads ingested via the API with job tracking |
+| **4** | **Agent intelligence** | 6, 7 | Cited answers from OpenAI; full agentic loop (route → grade → rewrite → ground) with honest refusals; every run traced in MLflow |
+| **5** | **Product experience** | 8, 9 | Streaming chat with memory that survives restarts, in a React UI with sources, verified badge and ingest page |
+| **6** | **Production** | 10 | `docker compose up -d` runs everything; smoke test passes; README roadmap fully ✅ |
+| **7** | **Stretch** | A, B | Evaluation report (hallucination, accuracy, bias) logged to MLflow; n8n workflows (licence permitting) |
 
 Each session ≈ 2–4 hours. Every session starts with the mentor's plan and waits for **"go"**
 (see `CLAUDE.md` §6).
+
+**Phase 1 prerequisites** (from `SETUP.md` Part A): Python 3.12 venv with deps installed, WSL2 + Rancher Desktop
+(Docker), `.env` with an OpenAI key and a project budget limit. Session 1 code can be written before Docker is
+ready, but its Definition of Done cannot pass until it is.
 
 ### Session 1 — Foundations & local infrastructure
 - **Goal:** A clean project skeleton: venv, config, logging, a FastAPI app with `/health` and `/ready`, and Qdrant + Postgres + MLflow running in Docker. `/ready` proves the API can reach each one, and that the OpenAI API key works (a free models lookup, not a paid completion).
