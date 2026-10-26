@@ -28,7 +28,8 @@ qdrant-client==1.19.1            # talks to the Qdrant vector DB (hybrid query, 
 fastembed==0.9.0                 # ONNX CPU models: dense, BM25 sparse, cross-encoder reranker
 
 # ---------- Ingestion ----------
-markitdown[pdf,docx]==0.1.8      # PDF/DOCX/MD/TXT -> Markdown
+markitdown[docx]==0.1.8          # DOCX -> Markdown (Word headings become # headings)
+pdfplumber==0.11.10              # PDFs page by page: exact page numbers + scanned-page detection (owner-approved 2026-10-26)
 gitpython==3.2.1                 # shallow-clone GitHub repos (needs git installed)
 
 # ---------- Database ----------

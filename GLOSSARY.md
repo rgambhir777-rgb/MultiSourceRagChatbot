@@ -54,6 +54,16 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 - **Golden dataset:** A hand-made list of questions with known correct answers and sources, used to measure quality.
 - **hit@k:** The share of questions where the correct source appears in the top-k results.
 - **MRR (Mean Reciprocal Rank):** The average of `1/rank` of the first correct result. Higher means the right answer appears nearer the top.
+- **Section / heading path:** The chain of headings a chunk sits under, e.g. `Installation > Before you start`. It is stored with the chunk so answers can say *where* in a document something came from.
+- **Token limit (of a model):** The most tokens a model can read at once. Our embedding model `bge-small` reads at most 512; anything longer is silently cut off. That's why chunks are capped at 400 of *our* tokens (different tokenizers count differently).
+- **Tokenizer / encoding:** The rulebook that splits text into tokens. Different models use different ones, so "400 tokens" depends on who is counting. We count with tiktoken's `o200k_base`.
+- **Recursive splitting:** Cutting text at the "nicest" boundary that fits: paragraph breaks first, then line breaks, then spaces, and only as a last resort mid-word.
+- **Fingerprint (content hash):** A short code computed from content (SHA-256). Identical content always gives the identical fingerprint, so duplicates are easy to spot.
+- **Deterministic:** Same input, same output, every time. Our chunking and sample files are deterministic, so fingerprints never change unless the content does.
+- **Magic bytes / file signature:** The first few bytes that identify a real file type (`%PDF-` for PDF, `PK` for zip/DOCX). Extensions can lie; signatures rarely do.
+- **Scanned PDF:** A PDF whose pages are photos of text. It has no text to extract without OCR (Optical Character Recognition), which we don't support, so it is reported clearly instead.
+- **Normalisation:** Cleaning text without changing its meaning (unify line endings, remove junk control characters, collapse blank lines).
+- **Encoding (text) / UTF-8 / Windows-1252 / BOM:** How characters are stored as bytes. UTF-8 is the modern standard. Windows-1252 is an older Windows one. A BOM is an invisible marker some editors put at the start of UTF-8 files; we strip it.
 - **Prompt injection:** Text inside a document that tries to give the model instructions ("ignore previous rules…"). We treat document text as data, not instructions.
 
 ## Agents & memory
@@ -154,6 +164,10 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 - **ruff:** A very fast Python linter + formatter.
 - **pytest:** The Python testing framework. *Unit tests* check small pieces in isolation. *Integration tests* check pieces working together (with real services).
 - **Mock / fake:** A stand-in object used in tests (e.g., a fake LLM that returns fixed answers).
+- **Side effect at import:** When merely importing a library *does* something (here: `magika`, used by MarkItDown, copied our whole `.env` into the environment). Good libraries avoid it; we defend against it with a test.
+- **Environment inheritance:** A program you start (a "child process") receives a copy of your environment variables. That's why secrets must not sit in `os.environ` unnecessarily.
+- **`tmp_path` (pytest):** A fresh empty folder per test, deleted afterwards. Perfect for creating broken or empty files to test error handling.
+- **Parametrised test:** One test function run several times with different inputs (`@pytest.mark.parametrize`).
 - **Fixture (pytest):** A reusable piece of test setup (e.g., `client`, `settings` in `tests/conftest.py`). pytest passes it to any test that names it as a parameter.
 - **Marker (pytest):** A label on a test (`@pytest.mark.integration`) used to select or skip groups of tests. A plain `pytest` skips `integration` and `openai` tests, so it is fast and free.
 - **TestClient:** FastAPI's tool for calling your API in tests without starting a real server.

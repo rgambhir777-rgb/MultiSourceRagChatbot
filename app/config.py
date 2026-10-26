@@ -6,10 +6,10 @@ clear error instead of surfacing later as a confusing bug.
 """
 
 from functools import lru_cache
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 from urllib.parse import quote
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 ReasoningEffort = Literal["none", "low", "medium", "high", "xhigh", "max"]
@@ -64,8 +64,12 @@ class Settings(BaseSettings):
     rerank_top_k: int = Field(default=5, gt=0)
 
     # ---------- Chunking ----------
-    chunk_size_tokens: int = Field(default=500, gt=0)
+    chunk_size_tokens: int = Field(default=400, gt=0)
     chunk_overlap_tokens: int = Field(default=75, ge=0)
+    # tiktoken encoding used to count tokens (OpenAI's current tokenizer family).
+    tokenizer_encoding: str = "o200k_base"
+    # A PDF page with fewer extracted characters than this is probably a scanned image.
+    min_chars_per_pdf_page: int = Field(default=20, ge=0)
 
     # ---------- Agent loop guards ----------
     max_query_rewrites: int = Field(default=2, ge=0)
@@ -102,6 +106,13 @@ class Settings(BaseSettings):
         if isinstance(value, list):
             return [str(ext).strip().lower() for ext in value]
         return value
+
+    @model_validator(mode="after")
+    def _overlap_smaller_than_chunk(self) -> Self:
+        """Overlap must be smaller than the chunk, or the splitter could never move forward."""
+        if self.chunk_overlap_tokens >= self.chunk_size_tokens:
+            raise ValueError("CHUNK_OVERLAP_TOKENS must be smaller than CHUNK_SIZE_TOKENS")
+        return self
 
     @property
     def postgres_conninfo(self) -> str:

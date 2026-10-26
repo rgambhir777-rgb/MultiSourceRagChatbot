@@ -70,6 +70,11 @@ def test_invalid_values_fail_fast(
         Settings(_env_file=None)
 
 
+def test_chunk_overlap_must_be_smaller_than_chunk_size() -> None:
+    with pytest.raises(ValidationError, match="must be smaller than CHUNK_SIZE_TOKENS"):
+        Settings(_env_file=None, chunk_size_tokens=100, chunk_overlap_tokens=100)
+
+
 def test_postgres_conninfo_escapes_special_characters() -> None:
     settings = Settings(_env_file=None, postgres_password="p@ss:w/rd", postgres_host="db")
     assert settings.postgres_conninfo == "postgresql://ragbot:p%40ss%3Aw%2Frd@db:5432/ragbot"

@@ -1,0 +1,33 @@
+Orbit T2 Smart Thermostat - Frequently Asked Questions
+(Lumen Home is a fictional company. Sample data for the MultiSource RAG Chatbot.)
+
+Q: Does the Orbit T2 work with a heat pump?
+A: Yes. During setup, choose "Heat pump" as the system type. If your heat pump has an O/B
+reversing valve wire, connect it to the O/B terminal and pick the correct energize mode in
+Settings > Equipment.
+
+Q: Can I control the thermostat without the internet?
+A: Yes. The touch screen works without Wi-Fi. You lose remote control from the app, Away mode
+and energy reports until the connection returns. Your schedule keeps running.
+
+Q: How many thermostats can one account have?
+A: Up to 20 thermostats across up to 5 homes on one Lumen Home account.
+
+Q: Can I share control with my family?
+A: Yes. In the app, open Account > Household and invite people by email. Invited members can
+change the temperature and schedules but cannot remove the device or delete data.
+
+Q: Why does the display turn off?
+A: To save energy, the screen dims after 30 seconds and turns off after 2 minutes. It wakes up
+when you walk past it, thanks to the motion sensor. You can change this in Settings > Display.
+
+Q: What is the temperature accuracy?
+A: The built-in sensor is accurate to plus or minus 0.5 degrees Celsius. You can add up to six
+wireless room sensors to average temperatures across rooms.
+
+Q: Does the Orbit T2 work with voice assistants?
+A: Yes, it works with the major voice assistants through the Lumen Home app integrations page.
+
+Q: How do I reset the thermostat to factory settings?
+A: Go to Settings > Reset > Factory reset on the device and confirm twice. This removes the
+thermostat from your account and erases its schedules. Wiring settings are also cleared.
