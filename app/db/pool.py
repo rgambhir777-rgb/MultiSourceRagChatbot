@@ -1,0 +1,48 @@
+"""PostgreSQL connection pool.
+
+Opening a database connection is slow (network round-trips, login). A *pool* opens a few
+connections once and lends them out: `with pool.connection() as conn: ...` borrows one, and
+returns it at the end of the block (committing the transaction, or rolling back on error).
+
+This is the synchronous pool, used by the CLI and background ingestion. The async API work
+in Session 8 adds an async pool.
+"""
+
+from pathlib import Path
+
+import structlog
+from psycopg_pool import ConnectionPool
+
+from app.config import Settings
+
+log = structlog.get_logger(__name__)
+
+SCHEMA_FILE = Path(__file__).with_name("schema.sql")
+
+
+def create_pool(settings: Settings, schema: str | None = None) -> ConnectionPool:
+    """Open a pool and fail fast if the database can't be reached.
+
+    `schema` points every connection at a different Postgres schema (tests use this to work in
+    an isolated, throwaway namespace instead of the real tables).
+    """
+    connect_kwargs: dict[str, object] = {"connect_timeout": settings.postgres_connect_timeout_s}
+    if schema is not None:
+        connect_kwargs["options"] = f"-c search_path={schema}"
+    pool = ConnectionPool(
+        settings.postgres_conninfo,
+        min_size=1,
+        max_size=settings.postgres_pool_max_size,
+        kwargs=connect_kwargs,
+        open=True,
+        name="ragbot",
+    )
+    pool.wait(timeout=settings.postgres_connect_timeout_s)  # raises PoolTimeout if DB is down
+    return pool
+
+
+def apply_schema(pool: ConnectionPool) -> None:
+    """Create any missing tables/indexes. Safe to call on every start."""
+    with pool.connection() as conn:
+        conn.execute(SCHEMA_FILE.read_text(encoding="utf-8"))
+    log.info("db_schema_applied")

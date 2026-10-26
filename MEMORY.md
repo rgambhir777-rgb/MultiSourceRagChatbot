@@ -274,3 +274,46 @@ append an entry using the template. At the start of every session, read the late
 **Learned:** chunking trade-offs, token limits per model, tokenizers, heading paths, recursive splitting, fingerprints, determinism, magic bytes, scanned PDFs, text encodings/BOM, import side effects, environment inheritance, `tmp_path`, parametrised tests.
 
 **Next:** Session 3 (Phase 2 part 2): embeddings + Qdrant indexing + Postgres document registry + CLI. Start with a plan and wait for "go".
+
+---
+
+## Session 3 / Phase 2 (part 2 of 2) — Embeddings & indexing (2026-10-26), COMPLETE → PHASE 2 DONE
+
+**Branch:** `session-3`, created from `main` after PRs #1 (session-1) and #2 (session-2) were merged.
+
+**Done:**
+- `app/retrieval/embeddings.py`: `Embedder` loads FastEmbed `bge-small-en-v1.5` (384-dim dense) and `Qdrant/bm25` (sparse) once.
+  - Separate `embed_passages` (batched) and `embed_query` methods.
+  - Models are cached in `.cache/fastembed` (about 65 MB). Loading from cache takes about 0.4 s.
+- `app/retrieval/vectorstore.py`: `VectorStore`.
+  - Collection with named vectors `dense` (cosine) and `bm25` (sparse, IDF modifier).
+  - Payload indexes: doc_id, source, file_type (keyword) and chunk_index (integer).
+  - Deterministic UUIDv5 point IDs (doc_id:chunk_index).
+  - Batched upserts with wait=True, `delete_document`, `delete_chunks_from`, `count`.
+  - Rejects a collection with a different vector size (`CollectionMismatchError`).
+- `app/db/pool.py` (sync psycopg pool; fail-fast `wait`; optional `schema` for test isolation), `app/db/schema.sql` (`documents` table; idempotent), `app/db/repositories.py` (parameterised SQL functions + a `DocumentRegistry` class).
+- `app/ingestion/pipeline.py`: `IngestionPipeline` and `open_pipeline()`.
+  - Outcomes: indexed / reindexed / skipped (same hash) / duplicate (same hash under another name) / failed (per file; it never stops the rest).
+  - Context header (`source > section`) is embedded with each chunk; the payload keeps the original text.
+- `app/cli.py`: `python -m app.cli ingest <paths…>` and `python -m app.cli documents`. Exit code 1 if any file failed.
+- Settings added: `EMBED_BATCH_SIZE=32`, `QDRANT_TIMEOUT_S=30`, `POSTGRES_POOL_MAX_SIZE=5`, `POSTGRES_CONNECT_TIMEOUT_S=5`.
+
+**Decisions (owner said "go" to all recommendations):**
+- Contextual header for embeddings.
+- Same content under a new name counts as a duplicate and is skipped.
+- Embedding tests use the real models (one-time download).
+- Re-runnable `schema.sql`, with no migration tool yet.
+- Design improvement over the plan: for a changed file, **upsert the new chunks first, then trim old positions ≥ new count**. The document is never missing from search, unlike delete-then-insert.
+- Write order for consistency: Qdrant first, Postgres registry last. A crash in between means the next run re-indexes, and deterministic IDs prevent duplicates.
+
+**Verified (Definition of Done):**
+- `python -m app.cli ingest data/sample_docs` → 4 indexed (23 chunks); a re-run → **4 skipped**.
+- Qdrant: 23 points, each with `dense` and `bm25` vectors; payload has page numbers for the PDF.
+- `python -m app.cli documents` → 4 documents / 23 chunks.
+- `pytest`: 82 passed. `pytest -m integration`: 2 passed (the new test covers index → skip → re-index a shortened file with stale chunks trimmed → duplicate, in a throwaway collection + schema that is cleaned up afterwards).
+- ruff clean.
+- Similarity demo: paraphrase 0.756 vs unrelated 0.397.
+
+**Learned:** embeddings & cosine similarity, dense vs sparse, BM25/IDF, named vectors, payload indexes, upserts, deterministic IDs, batching, contextual headers, connection pools, SQL tables, transactions, query parameters vs SQL injection, ON CONFLICT, consistency across two stores, dependency injection with fakes.
+
+**Next:** Phase 3 / Session 4: hybrid retrieval (dense + BM25 → RRF in Qdrant), cross-encoder reranking, and measuring retrieval with hit@k / MRR on a golden set. Start with a plan and wait for "go".

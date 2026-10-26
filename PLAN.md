@@ -218,7 +218,7 @@ ready, but its Definition of Done cannot pass until it is.
 
 ### Session 3 — Embeddings & indexing in Qdrant
 - **Goal:** Embed chunks (dense + sparse) and store them in Qdrant; keep a document registry in Postgres so re-ingesting the same file is skipped.
-- **Files:** `app/retrieval/embeddings.py`, `app/retrieval/vectorstore.py`, `app/db/pool.py`, `app/db/schema.sql`, `app/db/repositories.py`, `app/ingestion/pipeline.py`, `app/cli.py`, `tests/unit/test_embeddings.py`, `tests/integration/test_indexing.py`.
+- **Files:** `app/retrieval/embeddings.py`, `app/retrieval/vectorstore.py`, `app/db/pool.py`, `app/db/schema.sql`, `app/db/repositories.py`, `app/ingestion/pipeline.py`, `app/cli.py`, `tests/unit/test_embeddings.py`, `tests/unit/test_pipeline.py`, `tests/integration/test_indexing.py`.
 - **Concepts:** embeddings & cosine similarity; dense vs sparse vectors; Qdrant collections, named vectors, payloads, payload indexes; idempotent upserts (deterministic point IDs); batching; loading models once at startup; connection pools.
 - **Definition of done:** `python -m app.cli ingest data/sample_docs` indexes all docs; re-running reports "skipped (unchanged)"; Qdrant dashboard (`localhost:6333/dashboard`) shows points with both vectors; `documents` table lists each file; tests pass.
 - **Homework:** In the Qdrant dashboard, find one chunk and look at its payload. Embed two sentences that mean the same thing and two that don't; compare cosine similarities in a Python shell.

@@ -189,6 +189,9 @@ uvicorn app.main:create_app --factory --reload   # run API locally (dev) at http
 pytest                                   # fast, free unit tests (default excludes integration/openai)
 pytest -m integration                    # tests against real services (needs docker + OpenAI key)
 ruff format . ; ruff check .             # backend format + lint
+python -m app.cli ingest data/sample_docs   # index files/folders into Qdrant + Postgres registry
+python -m app.cli documents              # list indexed documents
+python -m app.ingestion.preview <file>   # see how a file is chunked (nothing stored)
 
 cd frontend
 npm ci                                   # install exact frontend deps from the lockfile
