@@ -190,8 +190,8 @@ Built in 7 phases (10 milestones plus 2 stretch goals). Each phase ends in a dem
 | Phase | # | Milestone | Status |
 |---|---|---|---|
 | 0 · Design | 0 | Architecture, stack selection, build plan, dev-environment spec | ✅ Done |
-| 1 · Foundation | 1 | Config, logging, health/readiness API, Dockerised infrastructure | 🚧 In progress |
-| 2 · Knowledge pipeline | 2 | Document loading & structure-aware chunking | 🔲 Planned |
+| 1 · Foundation | 1 | Config, logging, health/readiness API, Dockerised infrastructure | ✅ Done |
+| 2 · Knowledge pipeline | 2 | Document loading & structure-aware chunking | ⏳ Next |
 | | 3 | Embeddings & indexing (Qdrant + Postgres document registry) | 🔲 Planned |
 | 3 · Retrieval & sources | 4 | Hybrid retrieval, reranking & retrieval metrics | 🔲 Planned |
 | | 5 | GitHub repo ingestion & ingestion API with background jobs | 🔲 Planned |

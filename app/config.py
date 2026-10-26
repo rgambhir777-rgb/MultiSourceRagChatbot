@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     fastembed_cache_dir: str = "./.cache/fastembed"
 
     # ---------- Retrieval ----------
-    qdrant_url: str = "http://localhost:6333"
+    qdrant_url: str = "http://127.0.0.1:6333"
     qdrant_api_key: SecretStr | None = None
     qdrant_collection: str = "knowledge_base"
     retrieve_candidates: int = Field(default=20, gt=0)
@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     history_max_turns: int = Field(default=10, gt=0)
 
     # ---------- PostgreSQL ----------
-    postgres_host: str = "localhost"
+    postgres_host: str = "127.0.0.1"
     postgres_port: int = Field(default=5432, ge=1, le=65535)
     postgres_db: str = "ragbot"
     postgres_user: str = "ragbot"
@@ -89,7 +89,7 @@ class Settings(BaseSettings):
     github_token: SecretStr | None = None
 
     # ---------- Observability ----------
-    mlflow_tracking_uri: str = "http://localhost:5000"
+    mlflow_tracking_uri: str = "http://127.0.0.1:5000"
     mlflow_experiment_name: str = "agentic-rag"
     tracing_enabled: bool = True
 

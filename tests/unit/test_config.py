@@ -15,6 +15,15 @@ def test_defaults_match_the_locked_stack() -> None:
     assert settings.openai_api_key is None
 
 
+def test_local_service_defaults_use_ipv4_loopback() -> None:
+    # "localhost" can resolve to IPv6 ::1 first; our container ports listen on IPv4 only,
+    # so some drivers (psycopg) hang until timeout before falling back. Use 127.0.0.1.
+    settings = Settings(_env_file=None)
+    assert settings.postgres_host == "127.0.0.1"
+    assert settings.qdrant_url.startswith("http://127.0.0.1:")
+    assert settings.mlflow_tracking_uri.startswith("http://127.0.0.1:")
+
+
 def test_secrets_are_masked_when_printed() -> None:
     settings = Settings(_env_file=None, openai_api_key="sk-secret-123", postgres_password="pw")
     text = repr(settings) + str(settings.model_dump())

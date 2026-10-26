@@ -193,3 +193,34 @@ append an entry using the template. At the start of every session, read the late
 5. Merge `session-1` into `main` via a pull request on GitHub.
 
 **Learned (glossary updated):** app factory, lifespan, SecretStr, fail fast, asyncio.gather, timeouts, worker threads, fixtures, markers, TestClient, named volumes, binding to 127.0.0.1, feature branches, pull requests.
+
+### Session 1 progress update (2026-10-26)
+- **OpenAI key added** by the owner and verified without displaying it:
+  - Format check passed.
+  - `.env` is git-ignored and untracked.
+  - A free `models.retrieve` call confirmed `gpt-6.1-sol` and `gpt-6-luna`, and `/ready` shows `openai: ok`.
+- **WSL2 installed** (WSL 3.0.3, kernel 6.18) with `wsl --install --no-distribution`, run elevated after the owner approved the UAC prompt. **A Windows restart is still pending.**
+- **Docker Desktop 4.97.0 installed by the owner** (Engine 29.9.2, Compose v5.6.1) instead of Rancher Desktop (D18). This is recorded in the CLAUDE.md stack table. The owner's choice is accepted; Docker Desktop is free for personal use.
+- Created `C:\Users\Rakes\.wslconfig` (memory 6GB, 8 processors, 2GB swap) so Docker can't starve the laptop.
+- **Blocked:** the Docker engine can't start until Windows restarts. On first launch, Docker Desktop shows its terms, which the owner must accept.
+
+### Session 1 / Phase 1 — COMPLETE (2026-10-26)
+**Done:**
+- Restarted Windows to activate WSL2. Launched Docker Desktop: Engine 29.9.2, with 8 CPUs and about 6 GB RAM, which shows `.wslconfig` applied.
+- `docker compose pull` and `docker compose up -d`: Qdrant, Postgres and MLflow were all **healthy** within about 9 s. The untested Qdrant `/dev/tcp` healthcheck worked the first time.
+- **Bug found and fixed:** the Postgres readiness check timed out from Windows.
+  - Cause: `localhost` resolves to IPv6 `::1` first. Container ports are bound to IPv4 `127.0.0.1` only, so psycopg/libpq waited for the connect timeout before falling back. Measured: `localhost` 8.02 s vs `127.0.0.1` 0.02 s.
+  - Fix: the defaults in `app/config.py`, `.env.example` and the owner's `.env` now use `127.0.0.1` for Qdrant, Postgres and MLflow (the API key was untouched).
+  - Added a unit test guarding these defaults.
+
+**Verified (Definition of Done):**
+- `docker compose ps`: 3 services healthy.
+- `pytest`: 18 passed.
+- `pytest -m integration`: 1 passed (real Qdrant, Postgres, MLflow and OpenAI).
+- `ruff format --check` and `ruff check`: clean.
+- Live `GET /ready` → HTTP 200 with every dependency ok: qdrant 47 ms, postgres 46 ms, mlflow 26 ms, openai 563 ms.
+- Qdrant dashboard (:6333/dashboard) and MLflow UI (:5000) load.
+
+**Learned:** loopback addresses, IPv4 vs IPv6, why `localhost` can be slow, Docker Desktop on WSL2.
+
+**Next:** merge `session-1` → `main` via a pull request. Then Phase 2 / Session 2: document loading and chunking. Start it with a plan and wait for "go".

@@ -78,7 +78,7 @@ code readable, and never skip the concept behind a change.
 | Tracing | MLflow Tracing (app: `mlflow-tracing`; server: `ghcr.io/mlflow/mlflow:v3.17.1`) | 3.17.1 | Apache-2.0 |
 | Logging | structlog (JSON logs) | 26.1.0 | MIT / Apache-2.0 |
 | Backend tests / lint | pytest, pytest-asyncio, ruff | 9.1.1 / 1.4.0 / 0.17.1 | MIT |
-| Containers | Docker Engine + Compose via **Rancher Desktop** (dockerd/moby) | latest | Apache-2.0 |
+| Containers | Docker Engine + Compose via **Docker Desktop** (owner installed it, 2026-10-26; replaces the planned Rancher Desktop) | 4.97.0 (Engine 29.9.2, Compose v5.6.1) | Proprietary app, free for personal use / small business; engine Apache-2.0 |
 | Evaluation (stretch) | DeepEval + own retrieval metrics | 4.3.1 | Apache-2.0 |
 | Workflows (stretch) | n8n (optional compose profile) | image `n8nio/n8n:2.45.0` | **Sustainable Use License — fair-code, NOT OSI open source.** Free to self-host for internal use. Owner must confirm before Stretch B. |
 

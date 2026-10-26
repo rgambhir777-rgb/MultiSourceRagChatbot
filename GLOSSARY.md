@@ -161,6 +161,9 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 - **`.dockerignore`:** Lists files Docker must never copy into an image (e.g., `.env`, `.venv`).
 - **Named volume:** A Docker volume with a name (`postgres_data`) that keeps data when containers are removed. Only `docker compose down -v` deletes it.
 - **Binding to `127.0.0.1`:** Makes a port reachable only from your own laptop, not from other devices on your Wi-Fi.
+- **Loopback / `127.0.0.1` vs `localhost`:** Both mean "this computer". But `localhost` resolves to *two* addresses: IPv4 `127.0.0.1` and IPv6 `::1`. Some drivers try `::1` first. Our containers only listen on IPv4, so that attempt hangs until a timeout. That's why our settings use `127.0.0.1` (the Phase 1 Postgres bug: 8 s → 0.02 s).
+- **IPv4 / IPv6:** Two versions of internet addresses. IPv4 looks like `127.0.0.1`; IPv6 looks like `::1`.
+- **Docker Desktop:** Docker's app for Windows/macOS. It runs the Docker engine inside a small Linux VM on WSL2 (the `docker-desktop` distribution).
 - **Feature branch:** A git branch for one piece of work (`session-1`). It is merged into `main` via a pull request once its checks pass.
 - **Pull request (PR):** A request on GitHub to merge a branch into `main`, where the changes can be reviewed first.
 
