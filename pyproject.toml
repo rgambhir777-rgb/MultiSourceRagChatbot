@@ -1,0 +1,38 @@
+# pyproject.toml — tool configuration for the Python backend.
+# Dependencies live in requirements.txt (pinned); this file only configures ruff and pytest.
+
+[project]
+name = "multisource-rag-chatbot"
+version = "0.1.0"
+description = "Agentic RAG chatbot over documents and GitHub repos (FastAPI + LangGraph + Qdrant + OpenAI)"
+requires-python = ">=3.12,<3.13"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = [".venv", "frontend", ".cache"]
+
+[tool.ruff.lint]
+# E/W pycodestyle, F pyflakes, I import order, B bugbear, UP pyupgrade,
+# SIM simplifications, N naming, ASYNC async pitfalls, S bandit (security).
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "N", "ASYNC", "S"]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+# Tests may use assert (S101) and fake secrets (S105/S106).
+"tests/**" = ["S101", "S105", "S106"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+# Plain `pytest` runs only fast, free unit tests. Opt in with: pytest -m integration
+addopts = "-ra --strict-markers -m 'not integration and not openai'"
+markers = [
+    "integration: needs the docker compose services running",
+    "openai: calls the real OpenAI API (needs OPENAI_API_KEY)",
+]

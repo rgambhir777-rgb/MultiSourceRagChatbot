@@ -145,3 +145,82 @@ append an entry using the template. At the start of every session, read the late
 **Open:**
 - The OpenAI docs page didn't explicitly confirm structured-output support for the GPT-6 models. Verify it in Session 6 with a real call.
 - The owner needs an OpenAI API key and a project budget limit before Session 1 (SETUP A5).
+
+---
+
+## Session 1 / Phase 1 — Foundation (2026-10-20), IN PROGRESS: code done, waiting on Docker + OpenAI key
+
+**Done (on branch `session-1`):**
+- Project docs:
+  - Divided the plan into 7 phases (`PLAN.md` §4) and grouped the README roadmap by phase.
+- Environment:
+  - Installed Python 3.12.10 (via `py install 3.12`) and created `.venv`. All of `requirements.txt` installed, and `pip check` is clean.
+  - Created `.env` from `.env.example`. The OpenAI key is still empty, and the owner adds it.
+- Tooling: `pyproject.toml` (ruff rules incl. security `S`; pytest markers; plain `pytest` skips integration/openai tests) and `.dockerignore`.
+- App code:
+  - `app/config.py`: typed Settings for every `.env` key. Secrets are `SecretStr`, empty values count as "not set", and invalid values fail fast.
+  - `app/logging_setup.py`: structlog. Readable console logs in dev, JSON in prod, and uvicorn logs routed through it.
+  - `app/agent/llm.py`: `make_openai_client()`, the only place OpenAI clients are created.
+  - `app/api/schemas.py` and `app/api/routes_health.py`: `/health` (liveness) and `/ready`. `/ready` checks Qdrant, Postgres, MLflow and OpenAI in parallel, each with a 5 s timeout, and returns 503 with per-dependency details. OpenAI error text is never echoed, because it can contain part of the key.
+  - `app/main.py`: `create_app()` factory plus lifespan, which opens and closes the shared httpx and OpenAI clients.
+- Infrastructure: `docker-compose.yml` with Qdrant v1.19.2, Postgres 17.11 and MLflow v3.17.1 (SQLite backend).
+  - Named volumes, healthchecks, and ports bound to 127.0.0.1 only.
+  - MLflow uses `--allowed-hosts` (verified the flag exists in the 3.17.1 source).
+- Tests:
+  - 17 unit tests (config + health/ready with fake checks).
+  - 1 integration test (`pytest -m integration`).
+
+**Verified:**
+- `pytest` → 17 passed (also with ResourceWarnings as errors).
+- `ruff format --check` and `ruff check` → clean.
+- Ran the real server with `uvicorn app.main:create_app --factory`:
+  - `/health` → 200 and `/docs` → 200.
+  - `/ready` → 503, correctly reporting Qdrant/MLflow "connection failed", Postgres "timed out after 5s" and OpenAI "key not set". All checks finished within one ~5 s timeout window.
+- `docker-compose.yml` parses as valid YAML. **Not yet run, because Docker isn't installed.**
+
+**Decisions:**
+- The API runs via the factory (`--factory`), so tests can build apps with their own settings.
+- The Postgres readiness check uses the sync driver in a worker thread, avoiding the Windows async issue until Session 8.
+- `/ready` checks both configured OpenAI model IDs with a free `models.retrieve` call.
+- Default `API_HOST` is now 127.0.0.1.
+- Added `HEALTH_CHECK_TIMEOUT_S` to `.env.example`.
+
+**Open — to finish the Phase 1 Definition of Done (owner):**
+1. Install WSL2 (admin + reboot) and Rancher Desktop (dockerd, Kubernetes off): SETUP A3–A4.
+2. Set up the OpenAI project, budget limit and key, then paste the key into `.env`: SETUP A5/A9.
+3. Run `docker compose up -d` → `docker compose ps` should show 3 healthy services. The Qdrant healthcheck uses a bash `/dev/tcp` trick that has not been tested on a real container yet.
+4. Run `pytest -m integration` → `/ready` returns 200 with all 4 dependencies `ok`.
+5. Merge `session-1` into `main` via a pull request on GitHub.
+
+**Learned (glossary updated):** app factory, lifespan, SecretStr, fail fast, asyncio.gather, timeouts, worker threads, fixtures, markers, TestClient, named volumes, binding to 127.0.0.1, feature branches, pull requests.
+
+### Session 1 progress update (2026-10-26)
+- **OpenAI key added** by the owner and verified without displaying it:
+  - Format check passed.
+  - `.env` is git-ignored and untracked.
+  - A free `models.retrieve` call confirmed `gpt-6.1-sol` and `gpt-6-luna`, and `/ready` shows `openai: ok`.
+- **WSL2 installed** (WSL 3.0.3, kernel 6.18) with `wsl --install --no-distribution`, run elevated after the owner approved the UAC prompt. **A Windows restart is still pending.**
+- **Docker Desktop 4.97.0 installed by the owner** (Engine 29.9.2, Compose v5.6.1) instead of Rancher Desktop (D18). This is recorded in the CLAUDE.md stack table. The owner's choice is accepted; Docker Desktop is free for personal use.
+- Created `C:\Users\Rakes\.wslconfig` (memory 6GB, 8 processors, 2GB swap) so Docker can't starve the laptop.
+- **Blocked:** the Docker engine can't start until Windows restarts. On first launch, Docker Desktop shows its terms, which the owner must accept.
+
+### Session 1 / Phase 1 — COMPLETE (2026-10-26)
+**Done:**
+- Restarted Windows to activate WSL2. Launched Docker Desktop: Engine 29.9.2, with 8 CPUs and about 6 GB RAM, which shows `.wslconfig` applied.
+- `docker compose pull` and `docker compose up -d`: Qdrant, Postgres and MLflow were all **healthy** within about 9 s. The untested Qdrant `/dev/tcp` healthcheck worked the first time.
+- **Bug found and fixed:** the Postgres readiness check timed out from Windows.
+  - Cause: `localhost` resolves to IPv6 `::1` first. Container ports are bound to IPv4 `127.0.0.1` only, so psycopg/libpq waited for the connect timeout before falling back. Measured: `localhost` 8.02 s vs `127.0.0.1` 0.02 s.
+  - Fix: the defaults in `app/config.py`, `.env.example` and the owner's `.env` now use `127.0.0.1` for Qdrant, Postgres and MLflow (the API key was untouched).
+  - Added a unit test guarding these defaults.
+
+**Verified (Definition of Done):**
+- `docker compose ps`: 3 services healthy.
+- `pytest`: 18 passed.
+- `pytest -m integration`: 1 passed (real Qdrant, Postgres, MLflow and OpenAI).
+- `ruff format --check` and `ruff check`: clean.
+- Live `GET /ready` → HTTP 200 with every dependency ok: qdrant 47 ms, postgres 46 ms, mlflow 26 ms, openai 563 ms.
+- Qdrant dashboard (:6333/dashboard) and MLflow UI (:5000) load.
+
+**Learned:** loopback addresses, IPv4 vs IPv6, why `localhost` can be slow, Docker Desktop on WSL2.
+
+**Next:** merge `session-1` → `main` via a pull request. Then Phase 2 / Session 2: document loading and chunking. Start it with a plan and wait for "go".

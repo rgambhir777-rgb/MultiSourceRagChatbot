@@ -1,0 +1,16 @@
+# Keep secrets, local environments and caches out of Docker build contexts and images.
+.env
+.env.*
+!.env.example
+.git
+.venv
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.ruff_cache
+.cache
+mlruns
+mlartifacts
+frontend/node_modules
+frontend/dist
+*.log

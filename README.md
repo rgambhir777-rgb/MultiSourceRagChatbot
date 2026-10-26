@@ -185,23 +185,23 @@ Risks were assessed up front, including API cost runaway, key leakage, rate limi
 
 ## Roadmap
 
-Built in 10 milestones plus 2 stretch goals. Each has explicit deliverables and a definition of done ([full plan](PLAN.md#4-build-sessions)).
+Built in 7 phases (10 milestones plus 2 stretch goals). Each phase ends in a demoable milestone, and each milestone has explicit deliverables and a definition of done ([full plan](PLAN.md#4-build-phases--sessions)).
 
-| # | Milestone | Status |
-|---|---|---|
-| 0 | Architecture, stack selection, build plan, dev-environment spec | ✅ Done |
-| 1 | Foundations: config, logging, health/readiness API, Dockerised infrastructure | ⏳ Next |
-| 2 | Document loading & structure-aware chunking | 🔲 Planned |
-| 3 | Embeddings & indexing (Qdrant + Postgres document registry) | 🔲 Planned |
-| 4 | Hybrid retrieval, reranking & retrieval metrics | 🔲 Planned |
-| 5 | GitHub repo ingestion & ingestion API with background jobs | 🔲 Planned |
-| 6 | LLM integration, baseline RAG & MLflow tracing | 🔲 Planned |
-| 7 | Agentic loop in LangGraph | 🔲 Planned |
-| 8 | Persistent memory & streaming chat API | 🔲 Planned |
-| 9 | React chat UI | 🔲 Planned |
-| 10 | One-command deployment & hardening | 🔲 Planned |
-| A | *Stretch:* evaluation of hallucination, accuracy and bias | 🔲 Planned |
-| B | *Stretch:* n8n automation workflows | 🔲 Planned |
+| Phase | # | Milestone | Status |
+|---|---|---|---|
+| 0 · Design | 0 | Architecture, stack selection, build plan, dev-environment spec | ✅ Done |
+| 1 · Foundation | 1 | Config, logging, health/readiness API, Dockerised infrastructure | ✅ Done |
+| 2 · Knowledge pipeline | 2 | Document loading & structure-aware chunking | ⏳ Next |
+| | 3 | Embeddings & indexing (Qdrant + Postgres document registry) | 🔲 Planned |
+| 3 · Retrieval & sources | 4 | Hybrid retrieval, reranking & retrieval metrics | 🔲 Planned |
+| | 5 | GitHub repo ingestion & ingestion API with background jobs | 🔲 Planned |
+| 4 · Agent intelligence | 6 | OpenAI integration, baseline RAG & MLflow tracing | 🔲 Planned |
+| | 7 | Agentic loop in LangGraph | 🔲 Planned |
+| 5 · Product experience | 8 | Persistent memory & streaming chat API | 🔲 Planned |
+| | 9 | React chat UI | 🔲 Planned |
+| 6 · Production | 10 | One-command deployment & hardening | 🔲 Planned |
+| 7 · Stretch | A | Evaluation of hallucination, accuracy and bias | 🔲 Planned |
+| | B | n8n automation workflows | 🔲 Planned |
 
 ---
 

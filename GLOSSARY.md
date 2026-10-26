@@ -86,6 +86,13 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 - **Content hash (SHA-256):** A fingerprint of a file's content. Same content gives the same hash, which lets us skip duplicates.
 - **Environment variables / `.env`:** Settings given to a program from outside its code (URLs, model names, secrets). `.env` holds them locally and is never committed.
 - **12-factor config:** The practice of keeping configuration in the environment, not in code.
+- **App factory (`create_app`):** A function that builds and returns a fresh app. Tests can make an app with their own settings, and uvicorn calls it with `--factory`.
+- **Lifespan:** Code that runs once when the API starts (open shared clients) and once when it stops (close them). It lives in `app/main.py`.
+- **`SecretStr`:** A Pydantic type for secrets. It prints as `**********`, so keys and passwords don't leak into logs or error messages. Use `.get_secret_value()` only where the real value is needed.
+- **Fail fast:** Detecting a problem (like an invalid setting) immediately at startup, with a clear error, instead of later in a confusing place.
+- **`asyncio.gather`:** Runs several async tasks *at the same time* and waits for all of them. `/ready` checks 4 dependencies in parallel, so it takes about as long as the slowest one, not the sum of all four.
+- **Timeout (`asyncio.wait_for`):** Gives up on a task after N seconds, so one stuck dependency can't hang the whole request.
+- **Worker thread (`to_thread.run_sync`):** Runs blocking code (like a sync database driver) off the event loop, so the API stays responsive.
 
 ## Frontend (React, JavaScript)
 
@@ -147,6 +154,18 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 - **ruff:** A very fast Python linter + formatter.
 - **pytest:** The Python testing framework. *Unit tests* check small pieces in isolation. *Integration tests* check pieces working together (with real services).
 - **Mock / fake:** A stand-in object used in tests (e.g., a fake LLM that returns fixed answers).
+- **Fixture (pytest):** A reusable piece of test setup (e.g., `client`, `settings` in `tests/conftest.py`). pytest passes it to any test that names it as a parameter.
+- **Marker (pytest):** A label on a test (`@pytest.mark.integration`) used to select or skip groups of tests. A plain `pytest` skips `integration` and `openai` tests, so it is fast and free.
+- **TestClient:** FastAPI's tool for calling your API in tests without starting a real server.
+- **`pyproject.toml`:** The standard config file for Python tools. Ours configures ruff and pytest.
+- **`.dockerignore`:** Lists files Docker must never copy into an image (e.g., `.env`, `.venv`).
+- **Named volume:** A Docker volume with a name (`postgres_data`) that keeps data when containers are removed. Only `docker compose down -v` deletes it.
+- **Binding to `127.0.0.1`:** Makes a port reachable only from your own laptop, not from other devices on your Wi-Fi.
+- **Loopback / `127.0.0.1` vs `localhost`:** Both mean "this computer". But `localhost` resolves to *two* addresses: IPv4 `127.0.0.1` and IPv6 `::1`. Some drivers try `::1` first. Our containers only listen on IPv4, so that attempt hangs until a timeout. That's why our settings use `127.0.0.1` (the Phase 1 Postgres bug: 8 s → 0.02 s).
+- **IPv4 / IPv6:** Two versions of internet addresses. IPv4 looks like `127.0.0.1`; IPv6 looks like `::1`.
+- **Docker Desktop:** Docker's app for Windows/macOS. It runs the Docker engine inside a small Linux VM on WSL2 (the `docker-desktop` distribution).
+- **Feature branch:** A git branch for one piece of work (`session-1`). It is merged into `main` via a pull request once its checks pass.
+- **Pull request (PR):** A request on GitHub to merge a branch into `main`, where the changes can be reviewed first.
 
 ## Evaluation & automation (stretch)
 
