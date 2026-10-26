@@ -1,0 +1,79 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 7 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 981 >>
+stream
+BT
+/F1 11 Tf
+14 TL
+60 740 Td
+(Orbit T2 Troubleshooting Guide) Tj T*
+(Lumen Home is a fictional company. Sample data for the MultiSource RAG Chatbot.) Tj T*
+() Tj T*
+(Error codes) Tj T*
+(E-114  Low power. The thermostat is not getting continuous power.) Tj T*
+(       Install the C-wire adapter or connect a C-wire. Random reboots are a sign.) Tj T*
+(E-207  Wi-Fi connection failed. Check the password and that the router is on.) Tj T*
+(       Move the router closer or use the 2.4 GHz band, which reaches further.) Tj T*
+(E-310  Temperature sensor fault. Restart the thermostat from Settings > Restart.) Tj T*
+(       If the error returns within a day, contact Lumen Home support.) Tj T*
+(E-402  No heating detected. The system did not heat within 15 minutes.) Tj T*
+(       Check the furnace switch, the breaker and the W1 wire.) Tj T*
+(E-405  No cooling detected. The system did not cool within 15 minutes.) Tj T*
+(       Check the outdoor unit breaker and the Y1 wire.) Tj T*
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 6 0 R /Resources << /Font << /F1 7 0 R >> >> >>
+endobj
+6 0 obj
+<< /Length 759 >>
+stream
+BT
+/F1 11 Tf
+14 TL
+60 740 Td
+(Common problems) Tj T*
+() Tj T*
+(The display is blank: check the breaker, then make sure the display is clipped) Tj T*
+(firmly onto the base plate. Wait two minutes after power returns.) Tj T*
+() Tj T*
+(The room feels warmer than the setting: the thermostat may be in direct sunlight) Tj T*
+(or above a lamp. Move it, or add a wireless room sensor and set it as primary.) Tj T*
+() Tj T*
+(The schedule is ignored: check that Hold is not active. A manual change holds) Tj T*
+(until the next schedule step unless you choose Hold permanently.) Tj T*
+() Tj T*
+(Contacting support) Tj T*
+(Have your serial number ready. It is in Settings > About and on the box.) Tj T*
+(Support hours are 8 a.m. to 8 p.m., Monday to Saturday.) Tj T*
+ET
+endstream
+endobj
+7 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000001279 00000 n 
+0000001405 00000 n 
+0000002215 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R >>
+startxref
+2285
+%%EOF

@@ -21,6 +21,8 @@ ignore = []
 [tool.ruff.lint.per-file-ignores]
 # Tests may use assert (S101) and fake secrets (S105/S106).
 "tests/**" = ["S101", "S105", "S106"]
+# Office Open XML namespace URLs are long fixed strings that cannot be wrapped sensibly.
+"scripts/make_sample_docs.py" = ["E501"]
 
 [tool.ruff.format]
 quote-style = "double"

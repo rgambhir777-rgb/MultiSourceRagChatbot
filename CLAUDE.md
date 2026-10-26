@@ -64,7 +64,7 @@ code readable, and never skip the concept behind a change.
 | Reranker | FastEmbed cross-encoder `Xenova/ms-marco-MiniLM-L-6-v2` | fastembed 0.9.0 | Apache-2.0 |
 | Vector database | Qdrant (hybrid query + RRF fusion server-side) | image `qdrant/qdrant:v1.19.2` | Apache-2.0 |
 | Relational DB / memory | PostgreSQL (app tables + LangGraph checkpoints) | image `postgres:17.11` | PostgreSQL |
-| Document parsing | MarkItDown (`[pdf,docx]`) | 0.1.8 | MIT |
+| Document parsing | MarkItDown (`[docx]`) for DOCX; **pdfplumber** for PDFs, page by page (owner-approved 2026-10-26: exact page numbers + scanned-page detection) | 0.1.8 / 0.11.10 | MIT / MIT |
 | Chunking | langchain-text-splitters | 1.1.3 | MIT |
 | GitHub ingestion | GitPython (shallow clone) | 3.2.1 | BSD-3 |
 | API | FastAPI + Uvicorn + sse-starlette | 0.152.0 / 0.54.0 / 3.5.0 | MIT / BSD |
@@ -117,7 +117,8 @@ Folders are created in the session that needs them (see `PLAN.md`), not up front
 │       └── test/setup.js      # Vitest + Testing Library setup
 ├── evals/                     # golden datasets + evaluation scripts (stretch)
 ├── n8n/                       # exported n8n workflow JSON (stretch)
-├── data/sample_docs/          # small sample documents for demos/tests
+├── data/sample_docs/          # small sample documents for demos/tests (fictional "Lumen Home" product docs)
+├── scripts/                   # one-off helper scripts (e.g. make_sample_docs.py generates the sample PDF/DOCX)
 └── tests/                     # unit/ and integration/ tests mirroring app/
 ```
 

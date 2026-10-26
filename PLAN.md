@@ -211,7 +211,7 @@ ready, but its Definition of Done cannot pass until it is.
 
 ### Session 2 — Document loading & chunking
 - **Goal:** Turn any PDF/MD/TXT/DOCX into clean, metadata-rich chunks.
-- **Files:** `app/ingestion/models.py`, `app/ingestion/loaders.py`, `app/ingestion/chunking.py`, `data/sample_docs/*`, `tests/unit/test_loaders.py`, `tests/unit/test_chunking.py`.
+- **Files:** `app/ingestion/models.py`, `app/ingestion/loaders.py` (pdfplumber for PDFs, MarkItDown for DOCX), `app/ingestion/chunking.py`, `app/ingestion/preview.py` (chunk viewer), `data/sample_docs/*`, `scripts/make_sample_docs.py`, `tests/unit/test_loaders.py`, `tests/unit/test_chunking.py`, `tests/unit/test_preview.py`, `tests/unit/test_secrets_isolation.py`.
 - **Concepts:** why chunking matters; chunk size & overlap trade-offs; Markdown-header splitting (keeps section titles as context); metadata (source, page/section, chunk index); content hashing for dedup; handling bad/empty/scanned files.
 - **Definition of done:** each sample file → list of `Chunk`s with `text`, `source`, `section`, `chunk_index`, `content_hash`; chunk sizes within limits; unit tests cover all 4 formats + an empty file + an unsupported type.
 - **Homework:** Change chunk size (e.g., 300 vs 1200 tokens) on one doc and write down how chunks differ. Which would you rather read to answer a question?

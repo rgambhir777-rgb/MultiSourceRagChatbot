@@ -224,3 +224,53 @@ append an entry using the template. At the start of every session, read the late
 **Learned:** loopback addresses, IPv4 vs IPv6, why `localhost` can be slow, Docker Desktop on WSL2.
 
 **Next:** merge `session-1` → `main` via a pull request. Then Phase 2 / Session 2: document loading and chunking. Start it with a plan and wait for "go".
+
+---
+
+## Session 2 / Phase 2 (part 1 of 2) — Document loading & chunking (2026-10-26), COMPLETE
+
+**Branch:** `session-2`, built on `session-1` because `session-1` was not merged yet. Merge `session-1` with a **merge commit** (not squash) first.
+
+**Done:**
+- `app/ingestion/models.py`: frozen `LoadedDocument` and `Chunk` dataclasses.
+- `app/ingestion/loaders.py`: `load_document(path, settings)`.
+  - MD/TXT: UTF-8 with a Windows-1252 fallback (plus a warning); BOM stripped.
+  - DOCX: MarkItDown's `DocxConverter`, called directly (no auto-detect fallback).
+  - PDF: pdfplumber, page by page, pages joined with `\f`.
+  - Checks: type allow-list, size limit (checked before reading), magic-byte signatures, DOCX zip structure, scanned-PDF detection (per-page warnings; error if every page is empty), text normalisation.
+  - Errors: specific `IngestionError` subclasses.
+- `app/ingestion/chunking.py`: `chunk_document(doc, settings)`.
+  - A hand-written section splitter: heading paths, code fences ignored, pages tracked, heading-only sections carried into the next section.
+  - Then LangChain's `RecursiveCharacterTextSplitter.from_tiktoken_encoder` (o200k_base; special tokens treated as text).
+  - Chunks carry text, source, section, chunk_index, token_count, content_hash, doc_hash and page.
+- `app/ingestion/preview.py`: `python -m app.ingestion.preview <file> [--chunk-size N --overlap N --full]`.
+- `data/sample_docs/`: fictional "Lumen Home / Orbit T2" handbook (.md), FAQ (.txt), troubleshooting guide (.pdf, 2 pages, error codes E-114…E-405), warranty/returns policy (.docx).
+  - The PDF/DOCX come from `scripts/make_sample_docs.py` (stdlib only, byte-deterministic).
+- Settings:
+  - `CHUNK_SIZE_TOKENS` 500 → **400** (owner-approved: stays under bge-small's 512-token limit).
+  - Added `TOKENIZER_ENCODING` and `MIN_CHARS_PER_PDF_PAGE`.
+  - Validator: overlap < chunk size.
+
+**Decisions (owner-approved):**
+- **pdfplumber for PDFs** (pinned 0.11.10; it's MIT and already what MarkItDown used). MarkItDown narrowed to `[docx]`.
+  - Reason: MarkItDown loses page boundaries. It trims a trailing blank page, and pages with tables/forms get joined with no page break at all, so page citations and scanned-page detection were unreliable.
+
+**Bugs found and fixed:**
+1. Files whose extension lies (text renamed to .pdf/.docx) and truncated DOCX were silently read as plain text by MarkItDown's fallback. Fixed with magic-byte checks, a DOCX zip-structure check, and calling the specific converters.
+2. Heading-only sections (e.g. "## Schedules and Auto-Learn" directly followed by "###") dropped their heading words. Caught by the "no words lost" test; fixed by carrying them into the next section.
+3. **Security:** MarkItDown's dependency `magika` runs `dotenv.load_dotenv(find_dotenv())` at import time. That copied the whole `.env` (OpenAI key, DB password) into `os.environ`, where child processes such as `git clone` in Session 5 would inherit it.
+   - Fixed by disabling `load_dotenv` while importing MarkItDown.
+   - `tests/unit/test_secrets_isolation.py` checks this in a fresh subprocess. A canary confirmed the raw import still leaks, so the test is meaningful.
+
+**Verified (Definition of Done):**
+- All 4 formats → chunks.
+- Max chunk sizes: handbook 135, FAQ 352, PDF 184, DOCX 58 tokens (all ≤ 400).
+- Chunking is deterministic: hashes are stable and unique.
+- `pytest`: 67 passed, also stable across different test orders.
+- `pytest -m integration`: 1 passed.
+- `ruff format --check` and `ruff check`: clean.
+- Note: tiktoken downloads its `o200k_base` file on first use (cached). The Docker image must pre-download it (Session 10).
+
+**Learned:** chunking trade-offs, token limits per model, tokenizers, heading paths, recursive splitting, fingerprints, determinism, magic bytes, scanned PDFs, text encodings/BOM, import side effects, environment inheritance, `tmp_path`, parametrised tests.
+
+**Next:** Session 3 (Phase 2 part 2): embeddings + Qdrant indexing + Postgres document registry + CLI. Start with a plan and wait for "go".
