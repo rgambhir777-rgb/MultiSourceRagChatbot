@@ -47,6 +47,14 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 - **Vector database:** A database built to store vectors and quickly find the nearest ones (Qdrant here).
 - **Collection (Qdrant):** Like a table: a named set of points (vectors + payload).
 - **Point (Qdrant):** One stored item: an ID, one or more vectors, and a payload.
+- **IDF (Inverse Document Frequency):** A weight that makes rare words count more than common ones. "E-207" appears in few chunks, so a match on it is strong evidence; "the" appears everywhere, so it counts for almost nothing. Qdrant applies IDF to our `bm25` vectors.
+- **Named vectors:** Several differently-shaped vectors stored on one Qdrant point (ours: `dense` and `bm25`), so one search can use either or both.
+- **Payload index:** An index on a payload field (like `doc_id`), so filtering by it is fast instead of scanning every point.
+- **Upsert:** "Update or insert": write a record, replacing it if one with the same ID already exists.
+- **Deterministic ID (UUIDv5):** An ID computed from fixed inputs (document + chunk position), so the same chunk always gets the same ID. Re-running ingestion overwrites instead of duplicating.
+- **Batching:** Processing items in groups (e.g. 32 chunks per model call, 256 points per Qdrant request) instead of one at a time (slow) or all at once (memory-hungry).
+- **Contextual chunk header:** Text prepended *only for embedding* (e.g. `orbit_handbook.md > Installation > Wiring`), so a vector knows what a short chunk is about. The stored text stays unchanged.
+- **Document registry:** Our Postgres table listing every indexed document with its fingerprint. It lets ingestion skip unchanged files and detect duplicates.
 - **Grounding / grounded answer:** Every claim in the answer is supported by the retrieved chunks.
 - **Citation:** A marker like `[2]` that links a sentence to the chunk it came from.
 - **Query rewriting:** Rephrasing a question (adding keywords, removing ambiguity) to get better search results.
@@ -92,6 +100,13 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 - **Background task / job:** Work that continues after the HTTP response returns (e.g., ingesting a large repo). Its status is polled with a `job_id`.
 - **Healthcheck — liveness vs readiness:** *Liveness* (`/health`) means "the process is running". *Readiness* (`/ready`) means "it can reach its dependencies and serve traffic".
 - **Connection pool:** A set of reusable open database connections. It is faster than connecting on every request.
+- **SQL / table / row / column:** SQL is the language for relational databases. Data lives in tables (like spreadsheets): each row is a record, each column a field.
+- **Postgres schema (namespace):** A named folder of tables inside one database. Our tests create a throwaway schema so they never touch the real tables.
+- **Transaction:** A group of database changes that succeed or fail together. `with pool.connection() as conn:` commits at the end of the block, or rolls everything back on error.
+- **Query parameters (`%s`) / SQL injection:** Values are sent separately from the SQL text, so text like `'; DROP TABLE documents;--` in a file name is treated as data, never as a command. Pasting values into SQL strings is how SQL injection happens.
+- **`ON CONFLICT ... DO UPDATE`:** Postgres's upsert: insert a row, or update it if the unique key (our `source`) already exists.
+- **Consistency between two stores:** Qdrant and Postgres can't share one transaction, so we order the writes (chunks first, registry last). A crash in between is fixed by simply re-running.
+- **Dependency injection / fakes:** The pipeline receives its embedder, store and registry instead of creating them, so tests can pass in-memory fakes and test the decision logic without Docker or models.
 - **Idempotent:** Doing it twice has the same effect as doing it once (e.g., re-ingesting an unchanged file).
 - **Content hash (SHA-256):** A fingerprint of a file's content. Same content gives the same hash, which lets us skip duplicates.
 - **Environment variables / `.env`:** Settings given to a program from outside its code (URLs, model names, secrets). `.env` holds them locally and is never committed.

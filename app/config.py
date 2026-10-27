@@ -55,11 +55,13 @@ class Settings(BaseSettings):
     embed_sparse_model: str = "Qdrant/bm25"
     rerank_model: str = "Xenova/ms-marco-MiniLM-L-6-v2"
     fastembed_cache_dir: str = "./.cache/fastembed"
+    embed_batch_size: int = Field(default=32, gt=0)  # chunks embedded per model call
 
     # ---------- Retrieval ----------
     qdrant_url: str = "http://127.0.0.1:6333"
     qdrant_api_key: SecretStr | None = None
     qdrant_collection: str = "knowledge_base"
+    qdrant_timeout_s: float = Field(default=30.0, gt=0)
     retrieve_candidates: int = Field(default=20, gt=0)
     rerank_top_k: int = Field(default=5, gt=0)
 
@@ -82,6 +84,8 @@ class Settings(BaseSettings):
     postgres_db: str = "ragbot"
     postgres_user: str = "ragbot"
     postgres_password: SecretStr = SecretStr("change-me-local-only")
+    postgres_pool_max_size: int = Field(default=5, gt=0)
+    postgres_connect_timeout_s: int = Field(default=5, gt=0)
 
     # ---------- Ingestion limits ----------
     max_upload_mb: int = Field(default=25, gt=0)
