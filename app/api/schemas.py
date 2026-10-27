@@ -97,3 +97,33 @@ class SimpleChatResponse(BaseModel):
     usage: dict[str, dict[str, Any]]
     cost_usd: float
     latency_ms: float
+
+
+class ChatRequest(BaseModel):
+    """Body of POST /api/chat."""
+
+    session_id: uuid.UUID
+    message: str = Field(min_length=1, max_length=4000)
+
+
+class SessionResponse(BaseModel):
+    id: uuid.UUID
+    title: str
+    turn_count: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class TurnResponse(BaseModel):
+    """One question + answer of a conversation, as shown when reopening it."""
+
+    question: str
+    answer: str
+    sources: list[SourceResponse]
+    grounded: bool | None
+    route: str
+
+
+class HistoryResponse(BaseModel):
+    session: SessionResponse
+    turns: list[TurnResponse]

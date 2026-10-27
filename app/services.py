@@ -11,6 +11,7 @@ from collections.abc import Callable
 from typing import Any, TypeVar
 
 import structlog
+from langgraph.checkpoint.postgres import PostgresSaver
 from psycopg_pool import ConnectionPool
 
 from app.agent.graph import RagAgent
@@ -22,8 +23,10 @@ from app.config import Settings
 from app.db.jobs import JobStore
 from app.db.pool import apply_schema, create_pool
 from app.db.repositories import DocumentRegistry
+from app.db.sessions import SessionStore
 from app.ingestion.jobs import JobRunner
 from app.ingestion.pipeline import IngestionPipeline
+from app.memory.checkpointer import create_checkpointer
 from app.retrieval.embeddings import Embedder
 from app.retrieval.reranker import Reranker
 from app.retrieval.retriever import Retriever
@@ -101,17 +104,28 @@ class Services:
             ),
         )
 
+    def sessions(self) -> SessionStore:
+        return self._get("sessions", lambda: SessionStore(self.pool()))
+
+    def checkpointer(self) -> PostgresSaver:
+        def build() -> PostgresSaver:
+            saver, pool = create_checkpointer(self.settings)
+            self._built["checkpoint_pool"] = pool  # closed in close()
+            return saver
+
+        return self._get("checkpointer", build)
+
     def agent(self) -> RagAgent:
-        """The LangGraph agent (memory/checkpointing is added in Session 8)."""
+        """The LangGraph agent with persistent memory and a streaming answer model."""
 
         def build() -> RagAgent:
             deps = AgentDeps(
                 settings=self.settings,
                 retriever=self.retriever(),
                 judge=LLMJudge(make_chat_model(self.settings, "judge")),
-                generator=make_chat_model(self.settings, "generator"),
+                generator=make_chat_model(self.settings, "generator", streaming=True),
             )
-            return RagAgent(deps)
+            return RagAgent(deps, self.checkpointer())
 
         return self._get("agent", build)
 
@@ -122,8 +136,9 @@ class Services:
                 self._built["job_runner"].shutdown()
             if "store" in self._built:
                 self._built["store"].close()
-            if "pool" in self._built:
-                self._built["pool"].close()
+            for pool in ("checkpoint_pool", "pool"):
+                if pool in self._built:
+                    self._built[pool].close()
             self._built.clear()
 
     def _get(self, name: str, build: Callable[[], T]) -> T:

@@ -35,3 +35,16 @@ CREATE TABLE IF NOT EXISTS ingest_jobs (
 );
 
 CREATE INDEX IF NOT EXISTS ingest_jobs_created_at_idx ON ingest_jobs (created_at DESC);
+
+-- Chat sessions (conversations). The messages themselves are stored by LangGraph's
+-- checkpointer (its own tables, keyed by thread_id = this id); this table holds the list
+-- shown in the UI's sidebar.
+CREATE TABLE IF NOT EXISTS chat_sessions (
+    id          UUID        PRIMARY KEY,
+    title       TEXT        NOT NULL DEFAULT 'New chat',
+    turn_count  INTEGER     NOT NULL DEFAULT 0 CHECK (turn_count >= 0),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS chat_sessions_updated_at_idx ON chat_sessions (updated_at DESC);

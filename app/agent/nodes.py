@@ -6,7 +6,7 @@ from Settings (MAX_QUERY_REWRITES, MAX_REGENERATIONS), so the agent can never lo
 """
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any
 
 import structlog
@@ -16,12 +16,14 @@ from langchain_core.runnables import RunnableConfig
 
 from app.agent.judge import Judge
 from app.agent.prompts import DIRECT_SYSTEM_PROMPT, NOT_FOUND_ANSWER, REGENERATE_INSTRUCTION
-from app.agent.rag import build_messages, fit_to_budget, message_text
+from app.agent.rag import build_messages, fit_to_budget, message_text, to_sources
 from app.agent.state import AgentState
 from app.config import Settings
 from app.retrieval.retriever import Retriever
 
 log = structlog.get_logger(__name__)
+
+WRITING_STEP = "Writing the answer"
 
 
 @dataclass(frozen=True)
@@ -79,7 +81,7 @@ class AgentNodes:
             messages.append(HumanMessage(REGENERATE_INSTRUCTION.format(claims=claims)))
         reply = self.d.generator.invoke(messages, config)
         return {"answer": message_text(reply.content).strip(), "relevant": chunks,
-                "steps": ["Writing the answer"]}  # fmt: skip
+                "steps": [WRITING_STEP]}  # fmt: skip
 
     def check_grounding(self, state: AgentState) -> dict[str, Any]:
         verdict = self.d.judge.check_grounding(state["answer"], state["relevant"])
@@ -110,8 +112,16 @@ class AgentNodes:
         return {"answer": message_text(reply.content).strip(), "relevant": [], "grounded": None}
 
     def finalize(self, state: AgentState) -> dict[str, Any]:
-        """Add the answer to the conversation (this is what memory keeps in Session 8)."""
-        return {"messages": [AIMessage(state["answer"])]}
+        """Add the answer to the conversation and record the turn for the history view."""
+        answer = state["answer"]
+        turn = {
+            "question": state["question"],
+            "answer": answer,
+            "sources": [asdict(s) for s in to_sources(state.get("relevant", []), answer)],
+            "grounded": state.get("grounded"),
+            "route": state.get("route", "retrieve"),
+        }
+        return {"messages": [AIMessage(answer)], "turns": [turn]}
 
     # --------------------------------------------------------------------- routing
 

@@ -19,6 +19,7 @@ from fastapi import FastAPI
 
 from app import __version__
 from app.agent.llm import make_openai_client
+from app.api.routes_chat import TurnGuard
 from app.api.routes_chat import router as chat_router
 from app.api.routes_health import build_readiness_checks
 from app.api.routes_health import router as health_router
@@ -43,6 +44,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.settings = settings
         app.state.readiness_checks = build_readiness_checks(settings, http, openai_client)
         app.state.services = Services(settings)  # models/pools are built on first use
+        app.state.turn_guard = TurnGuard()  # one running turn per conversation
         # set_experiment talks to the MLflow server: run it off the event loop.
         app.state.tracing = await anyio.to_thread.run_sync(setup_tracing, settings)
         log.info(

@@ -89,6 +89,10 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 - **Judge (in this project):** The small, cheap model making yes/no-style decisions (route, grade, rewrite, grounding check) with structured outputs, behind a `Judge` interface so tests can use a scripted fake.
 - **Standalone question:** A follow-up like "what about its price?" rewritten so it makes sense alone ("what is the price of the Orbit T2?"). Search needs this.
 - **Safe fallback:** What the agent does when a judge call fails: search rather than chat, keep passages rather than drop them, and say "couldn't verify" rather than "verified".
+- **Checkpoint / thread_id:** After every agent step LangGraph saves a snapshot of the state in Postgres under a `thread_id` (our conversation id). The next message loads the latest snapshot, which is why memory survives restarts.
+- **Deserialisation allow-list:** Only the listed Python types may be rebuilt from saved checkpoints, so a tampered database row can't make the app construct arbitrary objects.
+- **Thread-to-async bridge:** The agent runs in one worker thread and hands events to the async web response through a queue, so the server stays responsive while it works.
+- **409 Conflict:** The answer when a conversation is still busy with the previous message. Two simultaneous turns would corrupt its memory.
 - **Loop guard:** A maximum count (e.g., 2 rewrites) that stops an agent looping forever.
 - **Fallback:** A safe default used when something fails (e.g., the model returns invalid JSON).
 

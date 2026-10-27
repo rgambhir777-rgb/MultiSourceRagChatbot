@@ -5,7 +5,8 @@ changes; LangGraph merges them in. Fields with a *reducer* (`Annotated[..., redu
 combined instead of replaced: `messages` appends new chat messages, `steps` appends progress.
 """
 
-from typing import Annotated, Literal, TypedDict
+import operator
+from typing import Annotated, Any, Literal, TypedDict
 
 from langchain_core.messages import AnyMessage
 from langgraph.graph.message import add_messages
@@ -39,6 +40,9 @@ class AgentState(TypedDict, total=False):
     unsupported_claims: list[str]
     retry_generation: bool  # set by the grounding check: write the answer once more
     steps: Annotated[list[str], add_steps]  # human-readable progress, e.g. "Searching..."
+    # One record per finished turn (question, answer, sources, verification), kept for the
+    # chat history view. Not part of `messages`, which are sent back to the model.
+    turns: Annotated[list[dict[str, Any]], operator.add]
 
 
 # --------------------------------------------- judge outputs (OpenAI structured outputs)

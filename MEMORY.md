@@ -466,3 +466,38 @@ Owner asked to run Sessions 4–9 in one go ("go" with no decision answers). Def
 **Known improvement (not done):** the two rewrites for an unanswerable question were identical ("France capital city Paris"). Passing earlier failed queries to the rewriter, or stopping on a repeat, would save one search.
 
 **Next:** Session 8: Postgres checkpointer (memory survives restarts) + streaming `POST /api/chat` (SSE).
+
+---
+
+## Session 8 / Phase 5 (part 1) — Persistent memory & streaming chat API (2026-10-27), COMPLETE
+
+**Design change (better than planned):**
+- LangGraph's **synchronous** `PostgresSaver` is used, and each chat turn runs in **one worker thread**. Events reach the async SSE response through an asyncio queue (`loop.call_soon_threadsafe`).
+- This removes the Windows psycopg-async problem entirely, so the planned `python -m app.serve` launcher is **not needed**. The plain `uvicorn ... --factory` command works.
+- A cancel flag stops the agent when the browser disconnects.
+
+**Done:**
+- `app/memory/checkpointer.py` `create_checkpointer()`: its own small pool (autocommit, prepare_threshold=0, dict_row, schema search_path), `saver.setup()`, and a **deserialisation allow-list** (`JsonPlusSerializer(allowed_msgpack_modules=[RetrievedChunk])`). The allow-list removes LangGraph's "unregistered type" warning; that warning is a security feature.
+- `app/db/sessions.py` `SessionStore` + `chat_sessions` table: create, get, list_recent, record_turn (the first question becomes the title, max 60 chars), delete.
+- `app/db/pool.py` `ensure_schema()` is shared by both pools.
+- Agent:
+  - The `turns` state field (operator.add) records question, answer, sources, grounded and route per turn for the history view. It is kept OUT of `messages`, which are sent back to OpenAI.
+  - `RagAgent.stream(question, thread_id, cancel)` yields `ChatEvent`s: `status`, `token` (answer nodes only), `answer_reset` (before a regeneration), `sources`, `done`.
+  - "Writing the answer" is announced at the first token (LangGraph reports node steps only when a node finishes).
+- `Services`: `sessions()`, `checkpointer()` (its pool is closed on shutdown), and `agent()` now has memory plus a **streaming** generator.
+- API (`app/api/routes_chat.py`):
+  - `POST/GET /api/sessions`, `GET /api/sessions/{id}/history` (reads the checkpoint, no models loaded), `DELETE /api/sessions/{id}` (also deletes the thread's checkpoints).
+  - `POST /api/chat` → SSE with `X-Accel-Buffering: no`; 404 for an unknown session, 409 if the session is busy (`TurnGuard`), 503 without a key. Errors become a friendly `error` event.
+  - `/api/chat/simple` is kept as a baseline.
+
+**Verified (live, about $0.005):**
+- `curl -N` stream: status ×3 → "Writing the answer" → 50 token events → sources → done (grounded true, $0.0017).
+- Follow-up "And how do I fix it?" → standalone "How do I fix error E-114 on the Orbit T2 thermostat?" → correct and verified.
+- **API restarted**, then:
+  - history returned both turns with sources and grounded status,
+  - the title was auto-set,
+  - "What was my first question?" → direct route answered "What does error E-114 mean?".
+- `pytest` 153 passed. New tests cover event order, word-by-word tokens, answer_reset, cancel, saved turns, and the session/chat endpoints (SSE parsing, errors → error event, 404, 409, 422).
+- `pytest -m integration` 12 passed. **New: memory survives a restart using the real PostgresSaver** (fake LLMs, $0) and session store titles/counts. No test schemas were left behind.
+
+**Next:** Session 9: React chat UI.

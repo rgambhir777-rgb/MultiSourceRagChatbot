@@ -40,10 +40,15 @@ def create_pool(settings: Settings, schema: str | None = None) -> ConnectionPool
         name="ragbot",
     )
     pool.wait(timeout=settings.postgres_connect_timeout_s)  # raises PoolTimeout if DB is down
+    ensure_schema(pool, schema)
+    return pool
+
+
+def ensure_schema(pool: ConnectionPool, schema: str) -> None:
+    """Create a non-default Postgres schema if it doesn't exist yet (safe to repeat)."""
     if schema != "public":
         with pool.connection() as conn:
             conn.execute(sql.SQL("CREATE SCHEMA IF NOT EXISTS {}").format(sql.Identifier(schema)))
-    return pool
 
 
 def apply_schema(pool: ConnectionPool) -> None:
