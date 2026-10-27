@@ -1,0 +1,257 @@
+.panel {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.header {
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.header h1 {
+  margin: 0 0 4px;
+  font-size: 1.3rem;
+}
+
+.header p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.content {
+  display: grid;
+  gap: 28px;
+  max-width: 960px;
+  padding: 24px;
+}
+
+.error {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.addRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.card[data-dragging="true"] {
+  border: 2px dashed var(--accent);
+  background: var(--accent-soft);
+}
+
+.card h2 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+
+.card p {
+  margin: 0 0 14px;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  height: 38px;
+  padding: 0 16px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--accent-hover);
+}
+
+.button:disabled {
+  opacity: 0.45;
+}
+
+.button:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.repoForm {
+  display: flex;
+  gap: 8px;
+}
+
+.repoForm input {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+
+.count {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.muted {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.jobs {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.job {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.jobTop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.status {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  flex: none;
+}
+
+.status[data-status="running"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.status[data-status="succeeded"] {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.status[data-status="failed"] {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.target {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+}
+
+.progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.progress span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s;
+}
+
+.summary {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.jobError {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+.failures {
+  font-size: 0.83rem;
+  color: var(--text-muted);
+}
+
+.failures ul {
+  margin: 6px 0 0;
+  padding-left: 1.2em;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.table th,
+.table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table th {
+  color: var(--text-muted);
+  font-weight: 600;
+  background: var(--surface-2);
+}
+
+.source {
+  max-width: 480px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

@@ -142,6 +142,9 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 - **State (React):** Data a component remembers between renders (e.g., the messages list). Changing it re-renders the component.
 - **Hook:** A special React function starting with `use` (`useState`, `useEffect`) that adds features to components. A *custom hook* (`useChatStream`) bundles related logic for reuse.
 - **Effect (`useEffect`):** Code that runs after rendering to sync with the outside world (fetch data, start a timer). Its *cleanup* undoes it (abort the request).
+- **`useReducer`:** A React hook that keeps related state (here: a conversation's turns while streaming) in one place, changed only through named actions like `token` or `done`. It is easier to follow and test than many separate `useState` calls.
+- **StrictMode:** A development-only React check that runs some code twice to expose bugs such as impure state updates. This is why our state-update functions never have side effects.
+- **Idle timeout (UI):** If the server sends nothing for 90 s (it normally pings every 15 s), the UI gives up with a clear message instead of spinning forever.
 - **Re-render:** React calling a component function again to compute updated UI.
 - **SPA (Single-Page Application):** One HTML page whose content is swapped by JavaScript, with no full page reloads.
 - **Vite:** The frontend build tool. `npm run dev` gives a fast dev server. `npm run build` produces optimised static files in `dist/`.

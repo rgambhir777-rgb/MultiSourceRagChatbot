@@ -198,8 +198,8 @@ Built in 7 phases (10 milestones plus 2 stretch goals). Each phase ends in a dem
 | 4 · Agent intelligence | 6 | OpenAI integration, baseline RAG & MLflow tracing | ✅ Done |
 | | 7 | Agentic loop in LangGraph | ✅ Done |
 | 5 · Product experience | 8 | Persistent memory & streaming chat API | ✅ Done |
-| | 9 | React chat UI | ⏳ Next |
-| 6 · Production | 10 | One-command deployment & hardening | 🔲 Planned |
+| | 9 | React chat UI | ✅ Done |
+| 6 · Production | 10 | One-command deployment & hardening | ⏳ Next |
 | 7 · Stretch | A | Evaluation of hallucination, accuracy and bias | 🔲 Planned |
 | | B | n8n automation workflows | 🔲 Planned |
 
@@ -231,21 +231,35 @@ The target layout, with folders added as milestones are built:
 
 ## Getting started
 
-> These commands work once the corresponding milestone is complete. Full Windows instructions, with a verification step for each install, are in [SETUP.md](SETUP.md).
+> Full Windows instructions, with a verification step for each install, are in [SETUP.md](SETUP.md).
 
-**Prerequisites:** Docker with Compose (e.g. Rancher Desktop), Python 3.12, Node.js 24 LTS, and an **OpenAI API key** (set a project budget limit). A laptop with 8–16 GB of RAM is enough; no GPU is needed.
+**Prerequisites:** Docker with Compose (e.g. Docker Desktop), Python 3.12, Node.js 22.12+ (24 LTS recommended), and an **OpenAI API key** (set a project budget limit). A laptop with 8–16 GB of RAM is enough; no GPU is needed.
+
+### Run it locally (development mode, milestones 1–9)
 
 ```bash
 git clone https://github.com/rgambhir777-rgb/MultiSourceRagChatbot.git
 cd MultiSourceRagChatbot
-cp .env.example .env        # then set OPENAI_API_KEY in .env
+cp .env.example .env                      # then set OPENAI_API_KEY in .env
 
-# Full system (milestone 10)
-docker compose up -d --build
+docker compose up -d                      # Qdrant, PostgreSQL, MLflow
+python -m venv .venv && .venv/Scripts/activate && pip install -r requirements.txt
+python -m app.cli ingest data/sample_docs # index the sample documents
+uvicorn app.main:create_app --factory     # API on http://127.0.0.1:8000
+
+cd frontend && npm ci && npm run dev      # chat UI on http://localhost:5173
 ```
 
 | Service | URL |
 |---|---|
+| Chat app (dev) | http://localhost:5173 |
+| API docs (Swagger) | http://127.0.0.1:8000/docs |
+| Tracing (MLflow) | http://127.0.0.1:5000 |
+| Vector DB dashboard | http://127.0.0.1:6333/dashboard |
+
+**One-command deployment** (`docker compose up -d --build`, with the app served by nginx on port 8080) arrives with milestone 10.
+
+---|---|
 | Chat app | http://localhost:8080 |
 | API docs (Swagger) | http://localhost:8000/docs |
 | Tracing (MLflow) | http://localhost:5000 |

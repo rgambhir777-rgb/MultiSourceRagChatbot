@@ -1,0 +1,152 @@
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  padding: 16px 12px;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 6px 6px;
+  font-weight: 700;
+}
+
+.logo {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background:
+    linear-gradient(var(--accent-text), var(--accent-text)) 7px 8px / 12px 2.5px no-repeat,
+    linear-gradient(var(--accent-text), var(--accent-text)) 7px 12px / 9px 2.5px no-repeat,
+    linear-gradient(var(--accent-text), var(--accent-text)) 7px 16px / 6px 2.5px no-repeat,
+    var(--accent);
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 3px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.tab {
+  padding: 6px 8px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.tab[aria-current="page"] {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.newChat {
+  padding: 9px 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: none;
+  font-weight: 600;
+  text-align: left;
+}
+
+.newChat:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.error {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 0.82rem;
+}
+
+.list {
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.row {
+  position: relative;
+  display: flex;
+  border-radius: var(--radius);
+}
+
+.row:hover,
+.row[data-active="true"] {
+  background: var(--surface-2);
+}
+
+.row[data-active="true"] .sessionTitle {
+  color: var(--accent);
+}
+
+.session {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: none;
+  background: none;
+  text-align: left;
+}
+
+.sessionTitle,
+.sessionMeta {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sessionTitle {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.sessionMeta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.delete {
+  width: 28px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  opacity: 0;
+}
+
+.row:hover .delete,
+.row[data-active="true"] .delete,
+.delete:focus-visible {
+  opacity: 1;
+}
+
+.delete:hover {
+  color: var(--danger);
+}
+
+.emptyList {
+  padding: 8px 10px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}

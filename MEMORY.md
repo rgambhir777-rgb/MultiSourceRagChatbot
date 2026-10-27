@@ -501,3 +501,43 @@ Owner asked to run Sessions 4–9 in one go ("go" with no decision answers). Def
 - `pytest -m integration` 12 passed. **New: memory survives a restart using the real PostgresSaver** (fake LLMs, $0) and session store titles/counts. No test schemas were left behind.
 
 **Next:** Session 9: React chat UI.
+
+---
+
+## Session 9 / Phase 5 (part 2) — React chat UI (2026-10-27), COMPLETE → PHASE 5 DONE
+
+**Done (frontend/, React 19 + Vite 8, JavaScript, exact pins, committed lockfile, `.npmrc save-exact`):**
+- `npm install` matched every pin; `npm audit` reported 0 vulnerabilities.
+- Config: `vite.config.js` (dev proxy `/api`, `/health`, `/ready` → 127.0.0.1:8000; Vitest jsdom), `eslint.config.js` (flat config with @eslint/js, react-hooks recommended-latest, react-refresh), `.prettierrc`, `index.html` (inline SVG favicon).
+- `src/api/client.js`: every JSON call, with `ApiError`, timeouts and readable FastAPI `detail` messages.
+- `src/api/sse.js`: an incremental SSE parser (CRLF-safe: it holds a trailing `\r` so a `\r\n` split across chunks can't end an event early) and `streamChat` (fetch POST + ReadableStream + TextDecoder, AbortSignal).
+- `src/lib/citations.js`: `linkCitations` turns `[n]` into `#cite-n` links outside code (so `items[1]` is untouched), plus `timeAgo`.
+- Hooks:
+  - `useSessions`: list/new/select/delete, the last open chat remembered in localStorage (try/catch).
+  - `useChatStream`: a useReducer turn list; events are applied only to a still-streaming turn. Stop works through AbortController. A 90 s idle timeout gives a clear message. The stream of a just-created chat is not cancelled or wiped by that chat's history load (tracked through a `controller.sessionId` + version check).
+  - `useIngestJobs`: upload, add a repo, and poll active jobs every 1.5 s.
+- Components (+ CSS Modules): SessionSidebar, ChatWindow (empty state with example questions), MessageBubble (react-markdown + remark-gfm, citation chips, links `rel="noopener noreferrer"`, `aria-live`), ChatInput (Enter sends, Shift+Enter adds a new line, Stop while busy), StatusSteps, SourceList (expand + highlight on citation click), GroundingBadge, IngestPanel (drag-and-drop or choose files, GitHub URL, jobs with progress bars and failures, documents table).
+- Light and dark design tokens; responsive (the sidebar slides in under 760 px).
+
+**Bugs/issues found & fixed:**
+- Adjacent citations `[1][2]` weren't both linked (a test caught it).
+- React 19 lint `set-state-in-effect`: the initial loads now set state in promise callbacks.
+- Impure state updaters in `useSessions` were refactored.
+- **Streamed turns didn't log tokens/cost** (only `ask()` did): `_log_turn` now runs for both. A CLAUDE.md requirement.
+- The mobile placeholder wrapped and was clipped, so it was shortened.
+
+**Verified:**
+- Frontend: `npm run lint` clean, Prettier clean, `npm test` 26 passed (SSE parser incl. every split position, citations, ChatInput keyboard, MessageBubble incl. **no HTML execution** and safe links, App flow with mocked API), `npm run build` OK (125 KB gzip JS).
+- Backend: `pytest` 153 passed, integration 12 passed, ruff clean.
+- **Real browser (headless) end-to-end:** reopened a conversation; new chat → progress → Stop button → streamed answer "two years [1]" **✓ Verified**, $0.0008; citation click opened the source; sidebar title updated; Knowledge base listed 32 docs and 2 jobs; no horizontal overflow at 390 px. 0 console errors, 0 failed requests. Screenshots reviewed.
+
+**Observation:** `gpt-6.1-sol` sometimes takes about 24 s for a short answer (seen in several traces; other nodes take 1–2 s). This is on OpenAI's side. Options (owner decision, cost/quality trade-off): use gpt-6-luna for generation, or keep and accept.
+
+**Open items for the owner:**
+1. Merge PRs **session-4 → session-9 in order** (merge commits, not squash).
+2. GitPython is unused since Session 5 (subprocess git). Remove it from requirements.txt / the stack table?
+3. Decide on the generator-latency option above.
+4. Confirm the OpenAI project budget limit is set.
+5. Known improvement: the rewriter can repeat the same query (the Session 7 note).
+
+**Next:** Session 10 (Phase 6): Dockerfiles, full compose (api + nginx frontend), healthchecks, smoke test, one-command deploy. Plan first, then wait for "go".

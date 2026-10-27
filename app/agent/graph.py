@@ -117,15 +117,7 @@ class RagAgent:
         config = {"configurable": {"thread_id": thread_id}, "callbacks": [usage]}
         state = self.graph.invoke(new_turn(question.strip()), config)
         result = summarize(state, usage.usage_metadata, self._settings, started)
-        log.info(
-            "agent_turn_done",
-            route=result.route,
-            rewrites=result.rewrites,
-            regenerations=result.regenerations,
-            grounded=result.grounded,
-            cost_usd=round(result.cost_usd, 6),
-            latency_ms=result.latency_ms,
-        )
+        _log_turn(result, streamed=False)
         return result
 
     def stream(
@@ -152,8 +144,24 @@ class RagAgent:
                 yield from _events_for(mode, payload, final)
             result = summarize(final, usage.usage_metadata, self._settings, started)
             span.set_outputs({"answer": result.answer, "grounded": result.grounded})
+        _log_turn(result, streamed=True)
         yield ChatEvent("sources", {"sources": [asdict(s) for s in result.sources]})
         yield ChatEvent("done", _done_data(result))
+
+
+def _log_turn(result: "AgentResult", streamed: bool) -> None:
+    """Log every turn's path, token usage and estimated cost (CLAUDE.md: never the API key)."""
+    log.info(
+        "agent_turn_done",
+        streamed=streamed,
+        route=result.route,
+        rewrites=result.rewrites,
+        regenerations=result.regenerations,
+        grounded=result.grounded,
+        tokens={model: u.get("total_tokens") for model, u in result.usage.items()},
+        cost_usd=round(result.cost_usd, 6),
+        latency_ms=result.latency_ms,
+    )
 
 
 def _events_for(mode: str, payload: Any, final: dict[str, Any]) -> Iterator[ChatEvent]:
