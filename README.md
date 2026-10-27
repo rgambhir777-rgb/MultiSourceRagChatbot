@@ -196,8 +196,8 @@ Built in 7 phases (10 milestones plus 2 stretch goals). Each phase ends in a dem
 | 3 · Retrieval & sources | 4 | Hybrid retrieval, reranking & retrieval metrics | ✅ Done |
 | | 5 | GitHub repo ingestion & ingestion API with background jobs | ✅ Done |
 | 4 · Agent intelligence | 6 | OpenAI integration, baseline RAG & MLflow tracing | ✅ Done |
-| | 7 | Agentic loop in LangGraph | ⏳ Next |
-| 5 · Product experience | 8 | Persistent memory & streaming chat API | 🔲 Planned |
+| | 7 | Agentic loop in LangGraph | ✅ Done |
+| 5 · Product experience | 8 | Persistent memory & streaming chat API | ⏳ Next |
 | | 9 | React chat UI | 🔲 Planned |
 | 6 · Production | 10 | One-command deployment & hardening | 🔲 Planned |
 | 7 · Stretch | A | Evaluation of hallucination, accuracy and bias | 🔲 Planned |

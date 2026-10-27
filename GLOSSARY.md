@@ -85,6 +85,10 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 - **Reducer:** A rule for how a state field is updated (e.g., *append* new messages instead of replacing them).
 - **Checkpointer / checkpoint:** A saved snapshot of the graph's state after each step, stored in Postgres. It is how memory survives restarts.
 - **Thread / session:** One conversation. Its ID (`session_id` = LangGraph `thread_id`) selects which memory to load.
+- **Conditional edge:** A graph edge that picks the next node by looking at the state (e.g. after grading: generate, rewrite, or give up).
+- **Judge (in this project):** The small, cheap model making yes/no-style decisions (route, grade, rewrite, grounding check) with structured outputs, behind a `Judge` interface so tests can use a scripted fake.
+- **Standalone question:** A follow-up like "what about its price?" rewritten so it makes sense alone ("what is the price of the Orbit T2?"). Search needs this.
+- **Safe fallback:** What the agent does when a judge call fails: search rather than chat, keep passages rather than drop them, and say "couldn't verify" rather than "verified".
 - **Loop guard:** A maximum count (e.g., 2 rewrites) that stops an agent looping forever.
 - **Fallback:** A safe default used when something fails (e.g., the model returns invalid JSON).
 

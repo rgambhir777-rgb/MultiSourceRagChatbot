@@ -13,7 +13,10 @@ from typing import Any, TypeVar
 import structlog
 from psycopg_pool import ConnectionPool
 
+from app.agent.graph import RagAgent
+from app.agent.judge import LLMJudge
 from app.agent.llm import make_chat_model
+from app.agent.nodes import AgentDeps
 from app.agent.rag import SimpleRag
 from app.config import Settings
 from app.db.jobs import JobStore
@@ -97,6 +100,20 @@ class Services:
                 self.settings, self.retriever(), make_chat_model(self.settings, "generator")
             ),
         )
+
+    def agent(self) -> RagAgent:
+        """The LangGraph agent (memory/checkpointing is added in Session 8)."""
+
+        def build() -> RagAgent:
+            deps = AgentDeps(
+                settings=self.settings,
+                retriever=self.retriever(),
+                judge=LLMJudge(make_chat_model(self.settings, "judge")),
+                generator=make_chat_model(self.settings, "generator"),
+            )
+            return RagAgent(deps)
+
+        return self._get("agent", build)
 
     def close(self) -> None:
         """Release whatever was actually created (in reverse dependency order)."""

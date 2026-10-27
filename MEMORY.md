@@ -429,3 +429,40 @@ Owner asked to run Sessions 4–9 in one go ("go" with no decision answers). Def
 - `pytest` 132 passed; ruff clean.
 
 **Next:** Session 7: the LangGraph agent (route → retrieve → grade → rewrite → generate → grounding check).
+
+---
+
+## Session 7 / Phase 4 (part 2) — The LangGraph agent (2026-10-27), COMPLETE → PHASE 4 DONE
+
+**Done:**
+- `app/agent/state.py`:
+  - `AgentState` TypedDict. `messages` uses the add_messages reducer. `steps` uses a resettable `add_steps` reducer, where `None` starts a fresh list each turn.
+  - Structured outputs: `RouteDecision` (route + standalone question), `GradeResult`, `RewrittenQuery`, `GroundingVerdict`.
+- `app/agent/prompts.py`: route / grade / rewrite / grounding / direct prompts, plus a regenerate instruction listing the unsupported claims.
+- `app/agent/judge.py`: a `Judge` protocol and `LLMJudge` (gpt-6-luna `with_structured_output(strict=True)`). **Safe fallbacks:**
+  - route → retrieve
+  - grade → keep all
+  - rewrite → original question
+  - grounding → None (unverified, never "verified")
+  - Out-of-range passage numbers are ignored.
+- `app/agent/nodes.py`: nodes route, retrieve, grade, rewrite, generate (uses `fit_to_budget`; adds the regenerate instruction), check_grounding (sets an explicit `retry_generation` flag), not_found, direct_answer, finalize (appends the AIMessage). The routers are after_route, after_grade and after_grounding; loop limits come from Settings.
+- `app/agent/graph.py`: `build_graph(deps, checkpointer)`, `new_turn()` (resets per-turn fields), `RagAgent.ask(question, thread_id)` → `AgentResult` (answer, sources, grounded, route, standalone question, rewrites, regenerations, steps, usage, cost, latency). `@mlflow.trace`.
+- `Services.agent()` (no checkpointer yet). The Mermaid graph is exported into PLAN.md.
+
+**Verified:**
+- `pytest`: 144 passed. 12 agent tests cover the direct path, normal RAG, rewrite-then-answer, give-up-after-max-rewrites (no generator call), one regeneration, the bounded regeneration limit (marked unverified), an unverifiable answer, conversation memory with InMemorySaver (history reaches the router; counters and steps reset per turn), and judge fallbacks.
+- Real run (about $0.005 total):
+
+| question | path | result | cost |
+|---|---|---|---|
+| "Hi there!" | direct | friendly reply | $0.0003 |
+| "What does error E-207 mean?" | graded 5→2, verified | correct, cites PDF p.1 | $0.0018 |
+| "keeps rebooting at random" (reworded) | verified | C-wire / E-114, 2 sources | $0.0020 |
+| "Capital of France?" | 2 rewrites → not found | no generator call | $0.0004 |
+
+- Grading makes answers **cheaper** than the Session 6 baseline (about $0.002 vs $0.004): fewer passages reach the expensive model.
+- MLflow trace per turn: agent_turn → LangGraph → route 1.7 s, retrieve 1.1 s, grade 1.4 s, generate 2.9 s, check_grounding 1.1 s.
+
+**Known improvement (not done):** the two rewrites for an unanswerable question were identical ("France capital city Paris"). Passing earlier failed queries to the rewriter, or stopping on a repeat, would save one search.
+
+**Next:** Session 8: Postgres checkpointer (memory survives restarts) + streaming `POST /api/chat` (SSE).
