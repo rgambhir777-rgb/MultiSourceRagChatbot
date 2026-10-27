@@ -185,6 +185,15 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 - **Environment inheritance:** A program you start (a "child process") receives a copy of your environment variables. That's why secrets must not sit in `os.environ` unnecessarily.
 - **`tmp_path` (pytest):** A fresh empty folder per test, deleted afterwards. Perfect for creating broken or empty files to test error handling.
 - **Parametrised test:** One test function run several times with different inputs (`@pytest.mark.parametrize`).
+- **Shallow clone:** Downloading only the latest version of a repo (`--depth=1`), not its whole history. Much faster and smaller.
+- **SSRF (Server-Side Request Forgery):** Tricking a server into fetching a URL of the attacker's choice (e.g. an internal admin page). We prevent it by accepting only `https://github.com/<owner>/<repo>`.
+- **Symlink:** A file that points to another file. A malicious repo could use one to point at files outside the repo, so clones disable symlinks and skip them.
+- **Path traversal:** An uploaded file named `../../something` trying to write outside the upload folder. We keep only the final name part.
+- **subprocess (no shell):** Running a program (here `git`) with its arguments as a list. Nothing in the arguments can be interpreted as extra commands.
+- **Background job / worker:** Slow work (ingestion) handed to a separate thread. The API answers immediately with a job id (`202 Accepted`) and the client polls for status.
+- **HTTP status codes:** 200 OK, 202 Accepted (work queued), 400 bad request, 404 not found, 413 too large, 415 unsupported type, 422 invalid input, 503 not ready.
+- **Multipart upload:** The standard way browsers send files to a server in a POST request.
+- **Lazy initialisation:** Creating something expensive (a model, a connection pool) only the first time it is needed, then reusing it.
 - **Fixture (pytest):** A reusable piece of test setup (e.g., `client`, `settings` in `tests/conftest.py`). pytest passes it to any test that names it as a parameter.
 - **Marker (pytest):** A label on a test (`@pytest.mark.integration`) used to select or skip groups of tests. A plain `pytest` skips `integration` and `openai` tests, so it is fast and free.
 - **TestClient:** FastAPI's tool for calling your API in tests without starting a real server.

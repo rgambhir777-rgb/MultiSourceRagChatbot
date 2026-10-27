@@ -190,6 +190,7 @@ pytest                                   # fast, free unit tests (default exclud
 pytest -m integration                    # tests against real services (needs docker + OpenAI key)
 ruff format . ; ruff check .             # backend format + lint
 python -m app.cli ingest data/sample_docs   # index files/folders into Qdrant + Postgres registry
+python -m app.cli ingest-github https://github.com/pallets/itsdangerous   # index a public repo
 python -m app.cli documents              # list indexed documents
 python -m app.ingestion.preview <file>   # see how a file is chunked (nothing stored)
 

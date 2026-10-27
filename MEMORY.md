@@ -352,3 +352,44 @@ Owner asked to run Sessions 4–9 in one go ("go" with no decision answers). Def
 **Verified:** `pytest` 91 passed; `pytest -m integration` 7 passed (new: hybrid+rerank answers first, PDF page numbers, source filter, in a throwaway collection); ruff clean.
 
 **Next:** Session 5: GitHub ingestion + ingestion API with background jobs.
+
+---
+
+## Session 5 / Phase 3 (part 2) — GitHub ingestion & ingestion API (2026-10-27), COMPLETE → PHASE 3 DONE
+
+**Done:**
+- `app/ingestion/github.py`:
+  - `parse_repo_url` accepts only `https://github.com/<owner>/<repo>[.git]` (SSRF-safe).
+  - `check_repo_size` asks the GitHub API and refuses repos over `GITHUB_MAX_REPO_MB` *before* cloning.
+  - `clone_repo` runs `git` via **subprocess** (list args, no shell) with a hard timeout: `--depth=1 --single-branch --no-tags`, `GIT_ALLOW_PROTOCOL=https`, `GIT_LFS_SKIP_SMUDGE=1`, `core.symlinks=false` (set through `GIT_CONFIG_*` env vars), no prompts. Error messages never echo the URL, which could contain a token.
+  - `select_repo_files` skips vendor/build/.git dirs, hidden files, lockfiles, symlinks, binaries (NUL byte), empty and oversized files, and caps the file count.
+  - `remove_tree` handles Git's read-only files on Windows.
+- `CODE_LANGUAGES` (models.py): code/config types accepted **only** from repos (`load_document(..., allow_code=True)`).
+  - Chunking for code: one section (no Markdown heading parsing, since `#` is a comment), split by `RecursiveCharacterTextSplitter` language separators (class/def boundaries).
+- Pipeline: `ingest_repo(url, progress)`; `FileResult.source/name`; progress callbacks; `ingest_file(path, source=, allow_code=)`.
+- CLI: `python -m app.cli ingest-github <url>`.
+- Jobs:
+  - `ingest_jobs` table (`schema.sql`) and `app/db/jobs.py` `JobStore` (create, get, list_recent, mark_running, update_progress, finish, fail, fail_interrupted).
+  - `app/ingestion/jobs.py` `JobRunner`: a single worker thread; records progress, summary and per-file results; RepoError → failed with a clear message; crashes are recorded; upload temp dirs are removed.
+- `app/services.py` `Services`: a lazy, thread-safe container (pool, embedder, reranker, store, registry, jobs, pipeline, job_runner, retriever). Startup stays instant and tests don't need Docker. On first use, jobs left queued/running by a previous process are marked failed ("interrupted").
+- API (`app/api/routes_ingest.py`, all under `/api`):
+  - `POST /ingest/files` (multipart, streamed to disk, size/type/count limits, path-traversal-safe names) → 202 + job
+  - `POST /ingest/github` → 202 + job (bad URL → 422)
+  - `GET /jobs`, `GET /jobs/{id}`, `GET /documents`
+  - Sync DB work runs via `run_in_threadpool`.
+- Settings: `POSTGRES_SCHEMA` (test isolation; `create_pool` creates it), `GITHUB_MAX_REPO_MB=200`, `MAX_UPLOAD_FILES=20`.
+
+**Problems found & fixed:**
+- GitPython refuses `-c` clone options (good: config injection) → used `GIT_CONFIG_*` env vars instead.
+- **GitPython's clone timeout is unsupported on Windows** → switched to subprocess. **GitPython is now unused.** Owner decision: remove it from requirements.txt / the CLAUDE.md stack.
+- Deprecated Starlette status names updated (422 `UNPROCESSABLE_CONTENT`, 413 `CONTENT_TOO_LARGE`).
+
+**Verified:**
+- Live API:
+  - bad URL → 422; .csv upload → 415.
+  - Markdown upload job → succeeded (then removed again).
+  - `pallets/itsdangerous` via the API: 28 files indexed in about 49 s, with progress counting up. Search finds `timed.py` for "expiry time" and `exc.py` for "BadSignature".
+- `pytest` 121 passed. `pytest -m integration` 10 passed (real clone of `octocat/Spoon-Knife`; missing repo → clear error; job lifecycle + interrupted-job recovery). Nothing left behind.
+- Knowledge base now: 4 sample docs + itsdangerous (32 documents, 112 chunks).
+
+**Next:** Session 6: OpenAI answers with citations + token/cost logging + MLflow tracing.

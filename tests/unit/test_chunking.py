@@ -7,7 +7,7 @@ import pytest
 
 from app.config import Settings
 from app.ingestion.chunking import chunk_document, split_into_sections
-from app.ingestion.loaders import PAGE_BREAK, load_document
+from app.ingestion.loaders import PAGE_BREAK, UnsupportedFileTypeError, load_document
 from app.ingestion.models import LoadedDocument
 
 SAMPLES = Path(__file__).resolve().parents[2] / "data" / "sample_docs"
@@ -130,3 +130,31 @@ def test_small_chunk_size_creates_more_chunks_with_overlap(settings: Settings) -
 def test_special_token_text_is_treated_as_plain_text(settings: Settings) -> None:
     chunks = chunk_document(_doc("A document that mentions <|endoftext|> literally."), settings)
     assert "<|endoftext|>" in chunks[0].text
+
+
+# --------------------------------------------------------------- code files
+
+
+def test_code_is_split_at_language_boundaries_not_comment_headings(
+    settings: Settings, tmp_path: Path
+) -> None:
+    classes = "\n\n".join(
+        f"class Thing{i}:\n    # comment {i}\n    def run(self):\n        return {i}\n"
+        for i in range(8)
+    )
+    path = tmp_path / "things.py"
+    path.write_text("# Module comment\nimport os\n\n" + classes)
+    small = settings.model_copy(update={"chunk_size_tokens": 60, "chunk_overlap_tokens": 0})
+    document = load_document(path, small, source="o/r/things.py", allow_code=True)
+    chunks = chunk_document(document, small)
+    assert len(chunks) > 1
+    assert all(c.section == "" for c in chunks), "# comments must not become headings"
+    assert all(c.text.startswith(("class ", "# Module")) for c in chunks)
+    assert chunks[0].source == "o/r/things.py"
+
+
+def test_code_files_need_allow_code(settings: Settings, tmp_path: Path) -> None:
+    path = tmp_path / "script.py"
+    path.write_text("print('hi')")
+    with pytest.raises(UnsupportedFileTypeError):
+        load_document(path, settings)

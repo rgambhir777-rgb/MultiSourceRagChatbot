@@ -19,11 +19,11 @@ from functools import lru_cache
 
 import structlog
 import tiktoken
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_text_splitters import Language, RecursiveCharacterTextSplitter
 
 from app.config import Settings
 from app.ingestion.loaders import PAGE_BREAK
-from app.ingestion.models import SECTION_SEPARATOR, Chunk, LoadedDocument
+from app.ingestion.models import CODE_LANGUAGES, SECTION_SEPARATOR, Chunk, LoadedDocument
 
 log = structlog.get_logger(__name__)
 
@@ -43,11 +43,21 @@ class Section:
 def chunk_document(doc: LoadedDocument, settings: Settings) -> list[Chunk]:
     """Turn one document into ordered, fingerprinted chunks."""
     encoding = _encoding(settings.tokenizer_encoding)
+    is_code = doc.file_type in CODE_LANGUAGES
     splitter = _splitter(
-        settings.tokenizer_encoding, settings.chunk_size_tokens, settings.chunk_overlap_tokens
+        settings.tokenizer_encoding,
+        settings.chunk_size_tokens,
+        settings.chunk_overlap_tokens,
+        CODE_LANGUAGES.get(doc.file_type),
+    )
+    # Code is one section: "# ..." lines in code are comments, not Markdown headings.
+    sections = (
+        [Section(heading_path="", text=doc.text, page=None)]
+        if is_code
+        else split_into_sections(doc.text, paged=doc.page_count is not None)
     )
     chunks: list[Chunk] = []
-    for section in split_into_sections(doc.text, paged=doc.page_count is not None):
+    for section in sections:
         for piece in splitter.split_text(section.text):
             text = piece.strip()
             if not text:
@@ -117,12 +127,27 @@ def _encoding(name: str) -> tiktoken.Encoding:
     return tiktoken.get_encoding(name)
 
 
-@lru_cache(maxsize=8)
-def _splitter(encoding_name: str, chunk_size: int, overlap: int) -> RecursiveCharacterTextSplitter:
-    """Build (once per setting combination) a splitter that measures length in tokens."""
+@lru_cache(maxsize=32)
+def _splitter(
+    encoding_name: str, chunk_size: int, overlap: int, language: str | None = None
+) -> RecursiveCharacterTextSplitter:
+    """Build (once per setting combination) a splitter that measures length in tokens.
+
+    For a programming language, it prefers to cut at that language's boundaries (e.g. before
+    "class " or "def " in Python), so a function usually stays in one chunk.
+    """
+    extra: dict[str, object] = {}
+    if language is not None:
+        extra = {
+            "separators": RecursiveCharacterTextSplitter.get_separators_for_language(
+                Language(language)
+            ),
+            "is_separator_regex": True,
+        }
     return RecursiveCharacterTextSplitter.from_tiktoken_encoder(
         encoding_name=encoding_name,
         chunk_size=chunk_size,
         chunk_overlap=overlap,
         disallowed_special=(),  # text like "<|endoftext|>" in a document is just text
+        **extra,
     )

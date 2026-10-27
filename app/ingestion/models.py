@@ -46,3 +46,17 @@ def with_context(source: str, section: str, text: str) -> str:
     """
     header = SECTION_SEPARATOR.join(part for part in (source, section) if part)
     return f"{header}\n\n{text}"
+
+
+# Source-code and plain-config file types accepted from GitHub repos (never from uploads).
+# The value is the splitter language used for code-aware chunking (None = generic splitting).
+# Code is split at language boundaries (classes, functions) and never parsed for Markdown
+# headings: in Python or shell, "# comment" lines are comments, not headings.
+CODE_LANGUAGES: dict[str, str | None] = {
+    ".py": "python", ".js": "js", ".jsx": "js", ".mjs": "js", ".ts": "ts", ".tsx": "ts",
+    ".java": "java", ".kt": "kotlin", ".scala": "scala", ".go": "go", ".rs": "rust",
+    ".rb": "ruby", ".php": "php", ".c": "c", ".h": "c", ".cpp": "cpp", ".hpp": "cpp",
+    ".cs": "csharp", ".swift": "swift", ".lua": "lua", ".html": "html", ".rst": "rst",
+    ".sh": None, ".sql": None, ".css": None, ".toml": None, ".yaml": None, ".yml": None,
+    ".ini": None, ".cfg": None, ".json": None,
+}  # fmt: skip
