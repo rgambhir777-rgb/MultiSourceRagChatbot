@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     qdrant_api_key: SecretStr | None = None
     qdrant_collection: str = "knowledge_base"
     qdrant_timeout_s: float = Field(default=30.0, gt=0)
-    retrieve_candidates: int = Field(default=20, gt=0)
+    retrieve_candidates: int = Field(default=10, gt=0)
     rerank_top_k: int = Field(default=5, gt=0)
 
     # ---------- Chunking ----------

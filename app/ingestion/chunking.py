@@ -23,11 +23,10 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.config import Settings
 from app.ingestion.loaders import PAGE_BREAK
-from app.ingestion.models import Chunk, LoadedDocument
+from app.ingestion.models import SECTION_SEPARATOR, Chunk, LoadedDocument
 
 log = structlog.get_logger(__name__)
 
-SECTION_SEPARATOR = " > "
 _HEADING = re.compile(r"^(#{1,6})\s+(.+?)\s*#*\s*$")  # "## Title" -> level 2, "Title"
 _CODE_FENCE = re.compile(r"^\s*(```|~~~)")  # a "# comment" inside a code block is not a heading
 

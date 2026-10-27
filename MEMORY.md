@@ -317,3 +317,38 @@ append an entry using the template. At the start of every session, read the late
 **Learned:** embeddings & cosine similarity, dense vs sparse, BM25/IDF, named vectors, payload indexes, upserts, deterministic IDs, batching, contextual headers, connection pools, SQL tables, transactions, query parameters vs SQL injection, ON CONFLICT, consistency across two stores, dependency injection with fakes.
 
 **Next:** Phase 3 / Session 4: hybrid retrieval (dense + BM25 → RRF in Qdrant), cross-encoder reranking, and measuring retrieval with hit@k / MRR on a golden set. Start with a plan and wait for "go".
+
+---
+
+## Session 4 / Phase 3 (part 1) — Hybrid retrieval, reranking & metrics (2026-10-27), COMPLETE
+
+Owner asked to run Sessions 4–9 in one go ("go" with no decision answers). Defaults taken:
+- Real OpenAI calls only for manual checks (estimated under $1).
+- Branches pushed, but **not merged into main by Claude**. The owner merges the PRs in order.
+- Demo repo: a public one, because the owner's repo is private (GitHub API returns 404).
+
+**Done:**
+- `app/ingestion/models.py`: shared `SECTION_SEPARATOR` and `with_context(source, section, text)`, used by both ingestion and reranking.
+- `VectorStore.search(dense, sparse, mode, limit, sources)`: modes dense / sparse / hybrid. Hybrid uses Qdrant prefetch + `FusionQuery(RRF)`. Optional `MatchAny` source filter.
+- `app/retrieval/reranker.py`: `Reranker` (FastEmbed `TextCrossEncoder`, ms-marco-MiniLM-L-6-v2, about 80 MB; the first download took about 3 minutes because Hugging Face was slow).
+- `app/retrieval/retriever.py`: `Retriever.retrieve(question, mode, rerank, top_k, sources)` returning `RetrievedChunk` items (with a `citation` property). Logs search and rerank timings.
+- `evals/`: `golden.jsonl` (18 questions: keyword, direct and paraphrase kinds), `metrics.py` (hit@k, MRR, first_correct_rank), `retrieval_eval.py` (`python -m evals.retrieval_eval [--show-misses]`).
+
+**Results (18 questions, top 5):**
+
+| strategy | hit@1 | MRR | median ms |
+|---|---|---|---|
+| dense only | 0.67 | 0.76 | 42 |
+| BM25 only | 0.89 | 0.90 | 55 |
+| hybrid RRF | 0.94 | 0.94 | 47 |
+| hybrid + rerank (20 candidates) | 1.00 | 1.00 | 1660 |
+| hybrid + rerank (**10 candidates**) | **1.00** | **1.00** | **873** |
+
+- Dense alone missed exact codes (E-402 ranked 2nd).
+- BM25 alone missed paraphrases ("wipe back to how it came out of the box" → factory reset: not found).
+
+**Decision (measured):** `RETRIEVE_CANDIDATES` 20 → **10**: same quality at half the latency. Re-check with the eval if the knowledge base grows a lot.
+
+**Verified:** `pytest` 91 passed; `pytest -m integration` 7 passed (new: hybrid+rerank answers first, PDF page numbers, source filter, in a throwaway collection); ruff clean.
+
+**Next:** Session 5: GitHub ingestion + ingestion API with background jobs.

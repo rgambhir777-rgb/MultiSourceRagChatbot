@@ -33,3 +33,16 @@ class Chunk:
     content_hash: str  # SHA-256 of `text`: identical text => identical hash
     doc_hash: str  # content_hash of the parent LoadedDocument
     page: int | None = None  # PDFs only: page the chunk starts on
+
+
+SECTION_SEPARATOR = " > "
+
+
+def with_context(source: str, section: str, text: str) -> str:
+    """Prefix text with where it comes from, e.g. "handbook.md > Installation\n\n<text>".
+
+    Used both when embedding chunks (ingestion) and when reranking them (retrieval), so the
+    models always see a chunk together with its document and section.
+    """
+    header = SECTION_SEPARATOR.join(part for part in (source, section) if part)
+    return f"{header}\n\n{text}"

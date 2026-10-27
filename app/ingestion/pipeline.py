@@ -20,9 +20,9 @@ import structlog
 from app.config import Settings
 from app.db.pool import apply_schema, create_pool
 from app.db.repositories import DocumentRegistry
-from app.ingestion.chunking import SECTION_SEPARATOR, chunk_document
+from app.ingestion.chunking import chunk_document
 from app.ingestion.loaders import IngestionError, load_document
-from app.ingestion.models import Chunk, LoadedDocument
+from app.ingestion.models import Chunk, LoadedDocument, with_context
 from app.retrieval.embeddings import Embedder
 from app.retrieval.vectorstore import VectorStore
 
@@ -62,8 +62,7 @@ def text_for_embedding(chunk: Chunk) -> str:
     sees "orbit_handbook.md > Installation > Wiring the base plate". The stored payload keeps
     the original text for display.
     """
-    header = SECTION_SEPARATOR.join(part for part in (chunk.source, chunk.section) if part)
-    return f"{header}\n\n{chunk.text}"
+    return with_context(chunk.source, chunk.section, chunk.text)
 
 
 def discover_files(paths: Sequence[Path], allowed_types: Sequence[str]) -> list[Path]:

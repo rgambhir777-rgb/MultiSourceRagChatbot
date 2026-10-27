@@ -55,6 +55,8 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 - **Batching:** Processing items in groups (e.g. 32 chunks per model call, 256 points per Qdrant request) instead of one at a time (slow) or all at once (memory-hungry).
 - **Contextual chunk header:** Text prepended *only for embedding* (e.g. `orbit_handbook.md > Installation > Wiring`), so a vector knows what a short chunk is about. The stored text stays unchanged.
 - **Document registry:** Our Postgres table listing every indexed document with its fingerprint. It lets ingestion skip unchanged files and detect duplicates.
+- **Retrieval funnel (wide-then-narrow):** A cheap search casts a wide net (10 candidates), then an expensive but accurate reranker picks the best 5. You get most of the reranker's accuracy at a fraction of its cost.
+- **Latency/quality trade-off:** Reranking 20 candidates took ~1.7 s, 10 took ~0.9 s, with identical quality on our test set, so we chose 10. Decide such numbers by measuring, not guessing.
 - **Grounding / grounded answer:** Every claim in the answer is supported by the retrieved chunks.
 - **Citation:** A marker like `[2]` that links a sentence to the chunk it came from.
 - **Query rewriting:** Rephrasing a question (adding keywords, removing ambiguity) to get better search results.
