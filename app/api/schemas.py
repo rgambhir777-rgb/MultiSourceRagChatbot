@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -72,3 +72,28 @@ class DocumentResponse(BaseModel):
     page_count: int | None
     size_bytes: int
     updated_at: datetime
+
+
+# ----------------------------------------------------------------------------------- chat
+
+
+class SimpleChatRequest(BaseModel):
+    """Body of POST /api/chat/simple (a temporary, non-streaming endpoint)."""
+
+    question: str = Field(min_length=1, max_length=2000)
+
+
+class SourceResponse(BaseModel):
+    number: int
+    source: str
+    location: str
+    text: str
+    cited: bool
+
+
+class SimpleChatResponse(BaseModel):
+    answer: str
+    sources: list[SourceResponse]
+    usage: dict[str, dict[str, Any]]
+    cost_usd: float
+    latency_ms: float

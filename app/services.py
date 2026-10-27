@@ -13,6 +13,8 @@ from typing import Any, TypeVar
 import structlog
 from psycopg_pool import ConnectionPool
 
+from app.agent.llm import make_chat_model
+from app.agent.rag import SimpleRag
 from app.config import Settings
 from app.db.jobs import JobStore
 from app.db.pool import apply_schema, create_pool
@@ -86,6 +88,14 @@ class Services:
         return self._get(
             "retriever",
             lambda: Retriever(self.settings, self.embedder(), self.store(), self.reranker()),
+        )
+
+    def simple_rag(self) -> SimpleRag:
+        return self._get(
+            "simple_rag",
+            lambda: SimpleRag(
+                self.settings, self.retriever(), make_chat_model(self.settings, "generator")
+            ),
         )
 
     def close(self) -> None:

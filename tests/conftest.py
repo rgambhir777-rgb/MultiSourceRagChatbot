@@ -15,7 +15,12 @@ from app.main import create_app
 @pytest.fixture
 def settings() -> Settings:
     """Settings independent of the developer's .env, with a fake OpenAI key."""
-    return Settings(_env_file=None, openai_api_key="sk-test-not-a-real-key", log_level="WARNING")
+    return Settings(
+        _env_file=None,
+        openai_api_key="sk-test-not-a-real-key",
+        log_level="WARNING",
+        tracing_enabled=False,  # unit tests never talk to MLflow
+    )
 
 
 @pytest.fixture

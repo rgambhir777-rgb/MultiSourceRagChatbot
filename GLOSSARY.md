@@ -156,6 +156,9 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 
 ## Observability
 
+- **Prompt caching (OpenAI):** When a new request starts with the same text as a recent one (e.g. our system prompt), OpenAI reuses its earlier work and bills those "cached" input tokens at a discount. Traces show it as `cache_read_input_tokens`.
+- **Token budget (`PROMPT_MAX_TOKENS`):** Our own cap on prompt size. If the retrieved chunks don't fit, the least relevant ones are dropped, which bounds the cost of every request.
+- **Inline citations `[n]`:** Numbers in the answer pointing at the numbered sources it used, so every claim can be checked.
 - **Observability:** Being able to understand what the system did and why, from its outputs (logs, traces, metrics).
 - **Structured logging:** Logs as key/value JSON (`{"event": "retrieved", "count": 5}`) instead of free text, so they're searchable.
 - **Trace:** The full record of one request.

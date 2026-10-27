@@ -393,3 +393,39 @@ Owner asked to run Sessions 4–9 in one go ("go" with no decision answers). Def
 - Knowledge base now: 4 sample docs + itsdangerous (32 documents, 112 chunks).
 
 **Next:** Session 6: OpenAI answers with citations + token/cost logging + MLflow tracing.
+
+---
+
+## Session 6 / Phase 4 (part 1) — OpenAI answers, cost logging & tracing (2026-10-27), COMPLETE
+
+**Done:**
+- Verified with real calls before building:
+  - `gpt-6.1-sol` with `reasoning_effort=low` + `max_tokens`: OK.
+  - **`gpt-6-luna` `with_structured_output(..., strict=True)`: OK.** The Session 1 open question about structured outputs is resolved.
+- `app/agent/llm.py`:
+  - `make_chat_model(settings, "generator"|"judge", streaming=)`: model, reasoning effort, max_tokens, timeout, retries, base_url, all from Settings.
+  - `MissingAPIKeyError`.
+  - `estimate_cost_usd(settings, usage_by_model)`: handles dated model names.
+- `app/agent/prompts.py`: answer system prompt. It covers sources-only answers, `[n]` citations, the exact not-found sentence, and the injection defence (`<source>` content is data). Sources are numbered and their locations escaped.
+- `app/agent/rag.py`:
+  - `SimpleRag.answer()`: retrieve, `fit_to_budget` (`PROMPT_MAX_TOKENS`), generate, mark cited sources. The usage callback gives tokens and cost, which are logged.
+  - No chunks → not-found answer without an LLM call (no cost).
+  - `@mlflow.trace` plus a `retrieve` span.
+- `app/observability/tracing.py` `setup_tracing()`:
+  - `set_experiment` + `mlflow.langchain.autolog`.
+  - If MLflow is down, tracing is disabled with a warning (the app keeps working).
+  - `TRACING_ENABLED=false` → `mlflow.tracing.disable()` (no local mlruns).
+- API: temporary `POST /api/chat/simple` (503 without a key; 502 on OpenAI errors). `Services.simple_rag()`.
+- Unit tests use LangChain's `GenericFakeChatModel` (no network, no cost). The test settings disable tracing.
+
+**Bug found & fixed:** the API response mapping used the dataclass field `text` where the schema expected `answer`, causing a 500 *after* a successful LLM call. Fixed, and a route unit test was added (it would have caught this).
+
+**Verified (real, about $0.04 total spent on manual checks):**
+- E-207 → correct fix steps citing the PDF (page 1) and handbook.
+- itsdangerous expiry → correct `TimestampSigner`/`max_age` code citing `docs/timed.rst` + `timed.py`.
+- "Capital of France?" → "I couldn't find this in the documents."
+- **Cost ≈ $0.003–0.005 per question**; typical latency **2.3–4.4 s** (retrieval 0.5–1.5 s); occasional OpenAI slowness of about 24 s, seen in traces.
+- MLflow: one trace per request, spans `simple_rag → retrieve → ChatOpenAI` with token usage. OpenAI prompt caching was seen (`cache_read_input_tokens`); our cost estimate ignores the cache discount, so it is conservative.
+- `pytest` 132 passed; ruff clean.
+
+**Next:** Session 7: the LangGraph agent (route → retrieve → grade → rewrite → generate → grounding check).
