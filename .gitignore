@@ -35,3 +35,12 @@ Desktop.ini
 # --- Logs ---
 *.log
 npm-debug.log*
+
+# --- Playwright (E2E) output ---
+frontend/e2e-results/
+frontend/test-results/
+frontend/playwright-report/
+
+# --- CI test reports (generated) ---
+reports/
+frontend/reports/

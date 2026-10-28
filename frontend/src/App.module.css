@@ -1,0 +1,77 @@
+.app {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  height: 100%;
+}
+
+.main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.main > :last-child {
+  flex: 1;
+  min-height: 0;
+}
+
+.banner {
+  margin: 0;
+  padding: 8px 24px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 0.88rem;
+}
+
+.menuButton,
+.backdrop {
+  display: none;
+}
+
+/* Small screens: the sidebar slides in over the content. */
+@media (max-width: 760px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app > aside {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 20;
+    width: min(300px, 85vw);
+    transform: translateX(-100%);
+    transition: transform 0.2s;
+  }
+
+  .app > aside[data-open="true"] {
+    transform: none;
+  }
+
+  .menuButton {
+    display: block;
+    position: fixed;
+    top: 9px;
+    left: 10px;
+    z-index: 10;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    background: rgb(0 0 0 / 35%);
+  }
+
+  .main header {
+    padding-left: 58px;
+  }
+}

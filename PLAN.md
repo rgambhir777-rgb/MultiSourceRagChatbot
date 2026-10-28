@@ -251,6 +251,40 @@ ready, but its Definition of Done cannot pass until it is.
 - **Definition of done:** unit tests cover all 4 paths (direct, normal RAG, rewrite-then-answer, give-up-honestly) with a fake LLM; the Session 6 "unanswerable" question now gets an honest refusal; MLflow trace shows each node; graph diagram exported (`graph.get_graph().draw_mermaid()`) into `PLAN.md`.
 - **Homework:** Draw the graph on paper from memory. Then find in the trace where the grader removed an irrelevant chunk. **React prep:** react.dev → "Thinking in React" and "Describing the UI".
 
+**Agent graph (generated from the code by `graph.get_graph().draw_mermaid()`, Session 7):**
+
+```mermaid
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	route(route)
+	retrieve(retrieve)
+	grade(grade)
+	rewrite(rewrite)
+	generate(generate)
+	check_grounding(check_grounding)
+	not_found(not_found)
+	direct_answer(direct_answer)
+	finalize(finalize)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> route;
+	check_grounding -.-> finalize;
+	check_grounding -.-> generate;
+	direct_answer --> finalize;
+	generate --> check_grounding;
+	grade -.-> generate;
+	grade -.-> not_found;
+	grade -.-> rewrite;
+	not_found --> finalize;
+	retrieve --> grade;
+	rewrite --> retrieve;
+	route -.-> direct_answer;
+	route -.-> retrieve;
+	finalize --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
+```
+
 ### Session 8 — Persistent memory & the streaming chat API
 - **Goal:** Per-session conversation memory in Postgres that survives restarts; a streaming `/chat` endpoint.
 - **Files:** `app/memory/checkpointer.py`, `app/api/routes_chat.py`, schema additions (`sessions` table), `tests/integration/test_chat_stream.py`, `tests/integration/test_memory_persistence.py`.

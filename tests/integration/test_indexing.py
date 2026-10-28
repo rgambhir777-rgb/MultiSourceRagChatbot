@@ -28,12 +28,10 @@ SAMPLE_CHUNKS = 23  # 5 (docx) + 2 (txt) + 14 (md) + 2 (pdf) at the default 400-
 @pytest.fixture
 def isolated() -> Iterator[tuple[IngestionPipeline, VectorStore, DocumentRegistry]]:
     name = f"test_{uuid.uuid4().hex[:10]}"
-    settings = Settings(qdrant_collection=name)
+    settings = Settings(qdrant_collection=name, postgres_schema=name)
     embedder = Embedder(settings)
     store = VectorStore.from_settings(settings, embedder.dense_size)
-    pool = create_pool(settings, schema=name)
-    with pool.connection() as conn:
-        conn.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(name)))
+    pool = create_pool(settings)  # creates the throwaway schema
     try:
         store.ensure_collection()
         apply_schema(pool)

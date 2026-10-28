@@ -74,6 +74,8 @@ code readable, and never skip the concept behind a change.
 | Markdown rendering (answers) | react-markdown + remark-gfm | 10.1.0 / 4.0.1 | MIT |
 | Frontend tests | Vitest + React Testing Library + jest-dom + jsdom | 5.0.5 / 16.3.3 / 7.0.1 / 30.1.3 | MIT |
 | Frontend lint / format | ESLint (+ react-hooks, react-refresh plugins) + Prettier | 10.13.0 / 3.9.10 | MIT |
+| End-to-end (E2E) tests | Playwright (`@playwright/test`, headless Chromium) driving the real app (owner-requested 2026-10-28) | 1.64.1 | Apache-2.0 |
+| CI (tests + report, no deployment) | GitHub Actions: `.github/workflows/ci.yml`, official `actions/*` only, pinned to commit SHAs (owner-requested 2026-10-28) | — | GitHub service (free minutes for private repos) |
 | Frontend serving (prod) | nginx: serves the built files and proxies `/api` to the backend | image `nginx:1.30.6-alpine` (build stage `node:24.22.0-alpine`) | BSD-2 |
 | Tracing | MLflow Tracing (app: `mlflow-tracing`; server: `ghcr.io/mlflow/mlflow:v3.17.1`) | 3.17.1 | Apache-2.0 |
 | Logging | structlog (JSON logs) | 26.1.0 | MIT / Apache-2.0 |
@@ -190,6 +192,7 @@ pytest                                   # fast, free unit tests (default exclud
 pytest -m integration                    # tests against real services (needs docker + OpenAI key)
 ruff format . ; ruff check .             # backend format + lint
 python -m app.cli ingest data/sample_docs   # index files/folders into Qdrant + Postgres registry
+python -m app.cli ingest-github https://github.com/pallets/itsdangerous   # index a public repo
 python -m app.cli documents              # list indexed documents
 python -m app.ingestion.preview <file>   # see how a file is chunked (nothing stored)
 
@@ -199,4 +202,6 @@ npm run dev                              # React dev server at http://localhost:
 npm test                                 # Vitest
 npm run lint ; npm run format            # ESLint + Prettier
 npm run build                            # production build into frontend/dist
+npm run e2e                              # Playwright E2E tests vs the running app (API must be up; ~$0.03 of OpenAI calls)
+npm run e2e:report                       # open the HTML report with screenshots
 ```

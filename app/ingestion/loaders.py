@@ -22,7 +22,7 @@ import pdfplumber
 import structlog
 
 from app.config import Settings
-from app.ingestion.models import LoadedDocument
+from app.ingestion.models import CODE_LANGUAGES, LoadedDocument
 
 log = structlog.get_logger(__name__)
 
@@ -82,14 +82,21 @@ class ScannedDocumentError(EmptyDocumentError):
     """A PDF whose pages are images: there is no text to extract without OCR."""
 
 
-def load_document(path: Path, settings: Settings) -> LoadedDocument:
-    """Read, convert and clean one file. Raises an IngestionError subclass on any problem."""
+def load_document(
+    path: Path, settings: Settings, *, source: str | None = None, allow_code: bool = False
+) -> LoadedDocument:
+    """Read, convert and clean one file. Raises an IngestionError subclass on any problem.
+
+    `source` overrides the name used in citations (default: the file name); GitHub ingestion
+    passes "owner/repo/path/file.py". `allow_code` also accepts source-code types, which only
+    repo ingestion enables.
+    """
     file_type = path.suffix.lower()
-    raw = _read_checked(path, file_type, settings)
+    raw = _read_checked(path, file_type, settings, allow_code)
 
     warnings: list[str] = []
     page_count = None
-    if file_type in TEXT_TYPES:
+    if file_type in TEXT_TYPES or file_type in CODE_LANGUAGES:
         text = _decode_text(raw, warnings)
     elif file_type == ".pdf":
         pages = _extract_pdf_pages(path.name, raw)
@@ -104,7 +111,7 @@ def load_document(path: Path, settings: Settings) -> LoadedDocument:
         raise EmptyDocumentError(f"{path.name}: the file contains no text")
 
     document = LoadedDocument(
-        source=path.name,
+        source=source or path.name,
         file_type=file_type,
         text=text,
         content_hash=hashlib.sha256(raw).hexdigest(),
@@ -135,9 +142,10 @@ def normalize_text(text: str) -> str:
     return PAGE_BREAK.join(pages)
 
 
-def _read_checked(path: Path, file_type: str, settings: Settings) -> bytes:
+def _read_checked(path: Path, file_type: str, settings: Settings, allow_code: bool) -> bytes:
     """Validate type, size and file signature, and return the file's bytes."""
-    if file_type not in settings.allowed_file_types:
+    code_ok = allow_code and file_type in CODE_LANGUAGES
+    if file_type not in settings.allowed_file_types and not code_ok:
         allowed = ", ".join(settings.allowed_file_types)
         raise UnsupportedFileTypeError(f"{path.name}: '{file_type}' is not supported ({allowed})")
 

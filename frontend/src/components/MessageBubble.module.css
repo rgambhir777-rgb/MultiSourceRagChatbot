@@ -1,0 +1,163 @@
+.turn {
+  display: grid;
+  gap: 18px;
+}
+
+.question {
+  justify-self: end;
+  max-width: min(78%, 640px);
+  padding: 10px 16px;
+  border-radius: var(--radius-lg) var(--radius-lg) 4px var(--radius-lg);
+  background: var(--accent);
+  color: var(--accent-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.question p {
+  margin: 0;
+}
+
+.answer {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.body {
+  min-width: 0;
+  padding-top: 4px;
+}
+
+.markdown {
+  overflow-wrap: anywhere;
+}
+
+.markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown p,
+.markdown ul,
+.markdown ol {
+  margin: 0 0 0.75em;
+}
+
+.markdown ul,
+.markdown ol {
+  padding-left: 1.4em;
+}
+
+.markdown li + li {
+  margin-top: 0.25em;
+}
+
+.markdown pre {
+  margin: 0 0 0.75em;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.markdown :not(pre) > code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--code-bg);
+}
+
+.markdown table {
+  border-collapse: collapse;
+  margin: 0 0 0.75em;
+  font-size: 0.9em;
+}
+
+.markdown th,
+.markdown td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+}
+
+.cite {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  margin: 0 1px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 700;
+  vertical-align: 0.15em;
+}
+
+.cite:hover {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.caret {
+  display: inline-block;
+  width: 7px;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--accent);
+  animation: blink 1s steps(2) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.stats {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.error {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.note {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-style: italic;
+}

@@ -33,3 +33,30 @@ class Chunk:
     content_hash: str  # SHA-256 of `text`: identical text => identical hash
     doc_hash: str  # content_hash of the parent LoadedDocument
     page: int | None = None  # PDFs only: page the chunk starts on
+
+
+SECTION_SEPARATOR = " > "
+
+
+def with_context(source: str, section: str, text: str) -> str:
+    """Prefix text with where it comes from, e.g. "handbook.md > Installation\n\n<text>".
+
+    Used both when embedding chunks (ingestion) and when reranking them (retrieval), so the
+    models always see a chunk together with its document and section.
+    """
+    header = SECTION_SEPARATOR.join(part for part in (source, section) if part)
+    return f"{header}\n\n{text}"
+
+
+# Source-code and plain-config file types accepted from GitHub repos (never from uploads).
+# The value is the splitter language used for code-aware chunking (None = generic splitting).
+# Code is split at language boundaries (classes, functions) and never parsed for Markdown
+# headings: in Python or shell, "# comment" lines are comments, not headings.
+CODE_LANGUAGES: dict[str, str | None] = {
+    ".py": "python", ".js": "js", ".jsx": "js", ".mjs": "js", ".ts": "ts", ".tsx": "ts",
+    ".java": "java", ".kt": "kotlin", ".scala": "scala", ".go": "go", ".rs": "rust",
+    ".rb": "ruby", ".php": "php", ".c": "c", ".h": "c", ".cpp": "cpp", ".hpp": "cpp",
+    ".cs": "csharp", ".swift": "swift", ".lua": "lua", ".html": "html", ".rst": "rst",
+    ".sh": None, ".sql": None, ".css": None, ".toml": None, ".yaml": None, ".yml": None,
+    ".ini": None, ".cfg": None, ".json": None,
+}  # fmt: skip

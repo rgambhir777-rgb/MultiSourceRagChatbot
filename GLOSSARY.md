@@ -55,6 +55,8 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 - **Batching:** Processing items in groups (e.g. 32 chunks per model call, 256 points per Qdrant request) instead of one at a time (slow) or all at once (memory-hungry).
 - **Contextual chunk header:** Text prepended *only for embedding* (e.g. `orbit_handbook.md > Installation > Wiring`), so a vector knows what a short chunk is about. The stored text stays unchanged.
 - **Document registry:** Our Postgres table listing every indexed document with its fingerprint. It lets ingestion skip unchanged files and detect duplicates.
+- **Retrieval funnel (wide-then-narrow):** A cheap search casts a wide net (10 candidates), then an expensive but accurate reranker picks the best 5. You get most of the reranker's accuracy at a fraction of its cost.
+- **Latency/quality trade-off:** Reranking 20 candidates took ~1.7 s, 10 took ~0.9 s, with identical quality on our test set, so we chose 10. Decide such numbers by measuring, not guessing.
 - **Grounding / grounded answer:** Every claim in the answer is supported by the retrieved chunks.
 - **Citation:** A marker like `[2]` that links a sentence to the chunk it came from.
 - **Query rewriting:** Rephrasing a question (adding keywords, removing ambiguity) to get better search results.
@@ -83,6 +85,14 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 - **Reducer:** A rule for how a state field is updated (e.g., *append* new messages instead of replacing them).
 - **Checkpointer / checkpoint:** A saved snapshot of the graph's state after each step, stored in Postgres. It is how memory survives restarts.
 - **Thread / session:** One conversation. Its ID (`session_id` = LangGraph `thread_id`) selects which memory to load.
+- **Conditional edge:** A graph edge that picks the next node by looking at the state (e.g. after grading: generate, rewrite, or give up).
+- **Judge (in this project):** The small, cheap model making yes/no-style decisions (route, grade, rewrite, grounding check) with structured outputs, behind a `Judge` interface so tests can use a scripted fake.
+- **Standalone question:** A follow-up like "what about its price?" rewritten so it makes sense alone ("what is the price of the Orbit T2?"). Search needs this.
+- **Safe fallback:** What the agent does when a judge call fails: search rather than chat, keep passages rather than drop them, and say "couldn't verify" rather than "verified".
+- **Checkpoint / thread_id:** After every agent step LangGraph saves a snapshot of the state in Postgres under a `thread_id` (our conversation id). The next message loads the latest snapshot, which is why memory survives restarts.
+- **Deserialisation allow-list:** Only the listed Python types may be rebuilt from saved checkpoints, so a tampered database row can't make the app construct arbitrary objects.
+- **Thread-to-async bridge:** The agent runs in one worker thread and hands events to the async web response through a queue, so the server stays responsive while it works.
+- **409 Conflict:** The answer when a conversation is still busy with the previous message. Two simultaneous turns would corrupt its memory.
 - **Loop guard:** A maximum count (e.g., 2 rewrites) that stops an agent looping forever.
 - **Fallback:** A safe default used when something fails (e.g., the model returns invalid JSON).
 
@@ -132,6 +142,9 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 - **State (React):** Data a component remembers between renders (e.g., the messages list). Changing it re-renders the component.
 - **Hook:** A special React function starting with `use` (`useState`, `useEffect`) that adds features to components. A *custom hook* (`useChatStream`) bundles related logic for reuse.
 - **Effect (`useEffect`):** Code that runs after rendering to sync with the outside world (fetch data, start a timer). Its *cleanup* undoes it (abort the request).
+- **`useReducer`:** A React hook that keeps related state (here: a conversation's turns while streaming) in one place, changed only through named actions like `token` or `done`. It is easier to follow and test than many separate `useState` calls.
+- **StrictMode:** A development-only React check that runs some code twice to expose bugs such as impure state updates. This is why our state-update functions never have side effects.
+- **Idle timeout (UI):** If the server sends nothing for 90 s (it normally pings every 15 s), the UI gives up with a clear message instead of spinning forever.
 - **Re-render:** React calling a component function again to compute updated UI.
 - **SPA (Single-Page Application):** One HTML page whose content is swapped by JavaScript, with no full page reloads.
 - **Vite:** The frontend build tool. `npm run dev` gives a fast dev server. `npm run build` produces optimised static files in `dist/`.
@@ -154,6 +167,9 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 
 ## Observability
 
+- **Prompt caching (OpenAI):** When a new request starts with the same text as a recent one (e.g. our system prompt), OpenAI reuses its earlier work and bills those "cached" input tokens at a discount. Traces show it as `cache_read_input_tokens`.
+- **Token budget (`PROMPT_MAX_TOKENS`):** Our own cap on prompt size. If the retrieved chunks don't fit, the least relevant ones are dropped, which bounds the cost of every request.
+- **Inline citations `[n]`:** Numbers in the answer pointing at the numbered sources it used, so every claim can be checked.
 - **Observability:** Being able to understand what the system did and why, from its outputs (logs, traces, metrics).
 - **Structured logging:** Logs as key/value JSON (`{"event": "retrieved", "count": 5}`) instead of free text, so they're searchable.
 - **Trace:** The full record of one request.
@@ -178,11 +194,33 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 - **Multi-stage build:** A Dockerfile that builds in one stage and copies only what's needed into a small final image.
 - **ruff:** A very fast Python linter + formatter.
 - **pytest:** The Python testing framework. *Unit tests* check small pieces in isolation. *Integration tests* check pieces working together (with real services).
+- **End-to-end (E2E) test:** A test that drives the real app the way a person would (a real browser clicking and typing), through the UI, API, databases and the LLM. It catches problems unit tests can't, like two parts that each work alone but clash together.
+- **Playwright:** The tool that runs our E2E tests. It controls a headless Chromium browser, takes screenshots and records a step-by-step "trace" when a test fails.
+- **Headless browser:** A real browser running without a visible window, so tests can run unattended.
+- **Race condition:** A bug that depends on timing: which of two things finishes first. Our E2E tests found three, all versions of "a slow first load overwrites something newer the user just did".
+- **Flaky test:** A test that sometimes passes and sometimes fails without any code change, usually because of timing. We run the E2E suite twice to check it's stable.
+- **Regression test that proves itself:** After writing a test for a bug, remove the fix and check the test *fails*. Otherwise the test may guard nothing (this happened with our StrictMode test until we fixed it).
+- **CI (Continuous Integration):** Automatically running all tests on a clean machine whenever code is pushed, so problems are caught before they pile up. Ours runs on GitHub Actions.
+- **Workflow / job / step / runner:** A *workflow* (`.github/workflows/ci.yml`) is a pipeline. It has *jobs* (which can run in parallel), each made of *steps* (commands or actions), executed on a *runner* (a fresh virtual machine GitHub provides).
+- **Repository secret:** An encrypted value stored in GitHub (e.g. `OPENAI_API_KEY`) that workflows can use without it ever appearing in code or logs.
+- **Pinning an action to a SHA:** Referring to an action by its exact commit (`@3d3c42e…`) instead of a movable label (`@v7`), so nobody can change the code your pipeline runs.
+- **JUnit XML:** A standard test-result file format. pytest, Vitest and Playwright all write it; our `scripts/ci_summary.py` turns those files into one report.
+- **Artifact (CI):** A file a CI run keeps for download afterwards (here: test reports, screenshots, logs; kept 14 days).
+- **Connection health check (pool):** The pool tests a database connection before lending it out and replaces it if dead. Without it, the API kept failing after Postgres restarted (a bug found while building CI).
 - **Mock / fake:** A stand-in object used in tests (e.g., a fake LLM that returns fixed answers).
 - **Side effect at import:** When merely importing a library *does* something (here: `magika`, used by MarkItDown, copied our whole `.env` into the environment). Good libraries avoid it; we defend against it with a test.
 - **Environment inheritance:** A program you start (a "child process") receives a copy of your environment variables. That's why secrets must not sit in `os.environ` unnecessarily.
 - **`tmp_path` (pytest):** A fresh empty folder per test, deleted afterwards. Perfect for creating broken or empty files to test error handling.
 - **Parametrised test:** One test function run several times with different inputs (`@pytest.mark.parametrize`).
+- **Shallow clone:** Downloading only the latest version of a repo (`--depth=1`), not its whole history. Much faster and smaller.
+- **SSRF (Server-Side Request Forgery):** Tricking a server into fetching a URL of the attacker's choice (e.g. an internal admin page). We prevent it by accepting only `https://github.com/<owner>/<repo>`.
+- **Symlink:** A file that points to another file. A malicious repo could use one to point at files outside the repo, so clones disable symlinks and skip them.
+- **Path traversal:** An uploaded file named `../../something` trying to write outside the upload folder. We keep only the final name part.
+- **subprocess (no shell):** Running a program (here `git`) with its arguments as a list. Nothing in the arguments can be interpreted as extra commands.
+- **Background job / worker:** Slow work (ingestion) handed to a separate thread. The API answers immediately with a job id (`202 Accepted`) and the client polls for status.
+- **HTTP status codes:** 200 OK, 202 Accepted (work queued), 400 bad request, 404 not found, 413 too large, 415 unsupported type, 422 invalid input, 503 not ready.
+- **Multipart upload:** The standard way browsers send files to a server in a POST request.
+- **Lazy initialisation:** Creating something expensive (a model, a connection pool) only the first time it is needed, then reusing it.
 - **Fixture (pytest):** A reusable piece of test setup (e.g., `client`, `settings` in `tests/conftest.py`). pytest passes it to any test that names it as a parameter.
 - **Marker (pytest):** A label on a test (`@pytest.mark.integration`) used to select or skip groups of tests. A plain `pytest` skips `integration` and `openai` tests, so it is fast and free.
 - **TestClient:** FastAPI's tool for calling your API in tests without starting a real server.

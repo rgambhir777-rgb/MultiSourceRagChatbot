@@ -1,0 +1,18 @@
+{"id": "q01", "question": "What does error E-207 mean?", "expected_source": "orbit_troubleshooting.pdf", "expected_phrase": "E-207", "kind": "keyword"}
+{"id": "q02", "question": "How long is the warranty on the Orbit T2?", "expected_source": "lumen_warranty_returns.docx", "expected_phrase": "two-year limited warranty", "kind": "direct"}
+{"id": "q03", "question": "Can I run it on old 120 volt baseboard heating?", "expected_source": "orbit_handbook.md", "expected_phrase": "line-voltage", "kind": "paraphrase"}
+{"id": "q04", "question": "What temperature does the house drop to for heating when nobody is home?", "expected_source": "orbit_handbook.md", "expected_phrase": "16 °C", "kind": "paraphrase"}
+{"id": "q05", "question": "How many thermostats can I add to one account?", "expected_source": "orbit_faq.txt", "expected_phrase": "Up to 20 thermostats", "kind": "direct"}
+{"id": "q06", "question": "Is the Orbit T2 compatible with heat pumps?", "expected_source": "orbit_faq.txt", "expected_phrase": "Heat pump", "kind": "direct"}
+{"id": "q07", "question": "My house doesn't have a common wire, what should I do?", "expected_source": "orbit_handbook.md", "expected_phrase": "without a C-wire", "kind": "paraphrase"}
+{"id": "q08", "question": "At what time of night does the firmware update itself?", "expected_source": "orbit_handbook.md", "expected_phrase": "between 2 a.m. and 4 a.m.", "kind": "paraphrase"}
+{"id": "q09", "question": "I bought my thermostat at an electronics store. Can I return it to Lumen Home?", "expected_source": "lumen_warranty_returns.docx", "expected_phrase": "retailer's own return policy", "kind": "paraphrase"}
+{"id": "q10", "question": "How long is my temperature history stored?", "expected_source": "orbit_handbook.md", "expected_phrase": "24 months", "kind": "direct"}
+{"id": "q11", "question": "Why does the room feel hotter than what the thermostat is set to?", "expected_source": "orbit_troubleshooting.pdf", "expected_phrase": "direct sunlight", "kind": "paraphrase"}
+{"id": "q12", "question": "Which Wi-Fi security protocols are supported?", "expected_source": "orbit_handbook.md", "expected_phrase": "WPA2 or WPA3", "kind": "direct"}
+{"id": "q13", "question": "How long until I get my money back after a return?", "expected_source": "lumen_warranty_returns.docx", "expected_phrase": "10 business days", "kind": "paraphrase"}
+{"id": "q14", "question": "How precise is the built-in temperature sensor?", "expected_source": "orbit_faq.txt", "expected_phrase": "0.5 degrees", "kind": "paraphrase"}
+{"id": "q15", "question": "What is E-402?", "expected_source": "orbit_troubleshooting.pdf", "expected_phrase": "E-402", "kind": "keyword"}
+{"id": "q16", "question": "How do I wipe the thermostat back to how it came out of the box?", "expected_source": "orbit_faq.txt", "expected_phrase": "Factory reset", "kind": "paraphrase"}
+{"id": "q17", "question": "Does the motion sensor send data to the cloud?", "expected_source": "orbit_handbook.md", "expected_phrase": "Motion-sensor data never leaves the device", "kind": "direct"}
+{"id": "q18", "question": "What tools do I need to install it?", "expected_source": "orbit_handbook.md", "expected_phrase": "Phillips screwdriver", "kind": "direct"}

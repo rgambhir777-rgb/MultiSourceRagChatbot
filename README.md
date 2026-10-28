@@ -169,6 +169,7 @@ Risks were assessed up front, including API cost runaway, key leakage, rate limi
 
 ## Engineering practices
 
+- **Continuous integration.** Every push to `main` runs all four test suites on GitHub Actions (backend unit, frontend unit, integration against real Qdrant/Postgres/MLflow containers, and Playwright end-to-end tests in a real browser) and publishes a combined test report. Pull requests run the free suites. Actions are pinned to exact commits, and the workflow is read-only.
 - **Plan-first workflow.** Every milestone starts with a written plan and an explicit definition of done, and ends with verification and a log entry ([MEMORY.md](MEMORY.md)).
 - **Reproducible dependencies.** Every Python and npm package is pinned to an exact version. The full Python set was resolved against Python 3.12 on Windows (binary wheels only) and the npm set was checked for peer conflicts before any code was written. Docker images are pinned to exact tags.
 - **Testing strategy.** Unit tests for pure logic (chunking, rank fusion, SSE parsing, routing), agent-path tests using a fake LLM, integration tests against real services, and an end-to-end smoke test against the containers.
@@ -193,13 +194,13 @@ Built in 7 phases (10 milestones plus 2 stretch goals). Each phase ends in a dem
 | 1 · Foundation | 1 | Config, logging, health/readiness API, Dockerised infrastructure | ✅ Done |
 | 2 · Knowledge pipeline | 2 | Document loading & structure-aware chunking | ✅ Done |
 | | 3 | Embeddings & indexing (Qdrant + Postgres document registry) | ✅ Done |
-| 3 · Retrieval & sources | 4 | Hybrid retrieval, reranking & retrieval metrics | ⏳ Next |
-| | 5 | GitHub repo ingestion & ingestion API with background jobs | 🔲 Planned |
-| 4 · Agent intelligence | 6 | OpenAI integration, baseline RAG & MLflow tracing | 🔲 Planned |
-| | 7 | Agentic loop in LangGraph | 🔲 Planned |
-| 5 · Product experience | 8 | Persistent memory & streaming chat API | 🔲 Planned |
-| | 9 | React chat UI | 🔲 Planned |
-| 6 · Production | 10 | One-command deployment & hardening | 🔲 Planned |
+| 3 · Retrieval & sources | 4 | Hybrid retrieval, reranking & retrieval metrics | ✅ Done |
+| | 5 | GitHub repo ingestion & ingestion API with background jobs | ✅ Done |
+| 4 · Agent intelligence | 6 | OpenAI integration, baseline RAG & MLflow tracing | ✅ Done |
+| | 7 | Agentic loop in LangGraph | ✅ Done |
+| 5 · Product experience | 8 | Persistent memory & streaming chat API | ✅ Done |
+| | 9 | React chat UI | ✅ Done |
+| 6 · Production | 10 | One-command deployment & hardening | ⏳ Next |
 | 7 · Stretch | A | Evaluation of hallucination, accuracy and bias | 🔲 Planned |
 | | B | n8n automation workflows | 🔲 Planned |
 
@@ -231,21 +232,35 @@ The target layout, with folders added as milestones are built:
 
 ## Getting started
 
-> These commands work once the corresponding milestone is complete. Full Windows instructions, with a verification step for each install, are in [SETUP.md](SETUP.md).
+> Full Windows instructions, with a verification step for each install, are in [SETUP.md](SETUP.md).
 
-**Prerequisites:** Docker with Compose (e.g. Rancher Desktop), Python 3.12, Node.js 24 LTS, and an **OpenAI API key** (set a project budget limit). A laptop with 8–16 GB of RAM is enough; no GPU is needed.
+**Prerequisites:** Docker with Compose (e.g. Docker Desktop), Python 3.12, Node.js 22.12+ (24 LTS recommended), and an **OpenAI API key** (set a project budget limit). A laptop with 8–16 GB of RAM is enough; no GPU is needed.
+
+### Run it locally (development mode, milestones 1–9)
 
 ```bash
 git clone https://github.com/rgambhir777-rgb/MultiSourceRagChatbot.git
 cd MultiSourceRagChatbot
-cp .env.example .env        # then set OPENAI_API_KEY in .env
+cp .env.example .env                      # then set OPENAI_API_KEY in .env
 
-# Full system (milestone 10)
-docker compose up -d --build
+docker compose up -d                      # Qdrant, PostgreSQL, MLflow
+python -m venv .venv && .venv/Scripts/activate && pip install -r requirements.txt
+python -m app.cli ingest data/sample_docs # index the sample documents
+uvicorn app.main:create_app --factory     # API on http://127.0.0.1:8000
+
+cd frontend && npm ci && npm run dev      # chat UI on http://localhost:5173
 ```
 
 | Service | URL |
 |---|---|
+| Chat app (dev) | http://localhost:5173 |
+| API docs (Swagger) | http://127.0.0.1:8000/docs |
+| Tracing (MLflow) | http://127.0.0.1:5000 |
+| Vector DB dashboard | http://127.0.0.1:6333/dashboard |
+
+**One-command deployment** (`docker compose up -d --build`, with the app served by nginx on port 8080) arrives with milestone 10.
+
+---|---|
 | Chat app | http://localhost:8080 |
 | API docs (Swagger) | http://localhost:8000/docs |
 | Tracing (MLflow) | http://localhost:5000 |

@@ -12,13 +12,15 @@ overwrites it instead of duplicating it. That makes re-running an interrupted in
 
 import uuid
 from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import Any, Literal
 
 import structlog
 from qdrant_client import QdrantClient, models
 
 from app.config import Settings
 from app.ingestion.models import Chunk
-from app.retrieval.embeddings import EmbeddedTexts
+from app.retrieval.embeddings import EmbeddedTexts, SparseVector
 
 log = structlog.get_logger(__name__)
 
@@ -34,6 +36,18 @@ INDEXED_FIELDS = {
 }
 # Fixed namespace so the same (document, position) always produces the same point ID.
 _POINT_NAMESPACE = uuid.UUID("6f1d2c4e-8a3b-4f5e-9c7d-1b2a3c4d5e6f")
+
+
+SearchMode = Literal["dense", "sparse", "hybrid"]
+
+
+@dataclass(frozen=True)
+class SearchHit:
+    """One search result straight from Qdrant: point id, score and stored payload."""
+
+    id: str
+    score: float
+    payload: dict[str, Any]
 
 
 class CollectionMismatchError(RuntimeError):
@@ -129,6 +143,46 @@ class VectorStore:
             self.collection, points_selector=models.FilterSelector(filter=stale), wait=True
         )
 
+    def search(
+        self,
+        dense: list[float],
+        sparse: SparseVector,
+        *,
+        mode: SearchMode = "hybrid",
+        limit: int,
+        sources: Sequence[str] | None = None,
+    ) -> list[SearchHit]:
+        """Find the `limit` best chunks for a query.
+
+        - "dense": nearest by meaning (cosine similarity of dense vectors).
+        - "sparse": best keyword matches (BM25 with IDF).
+        - "hybrid": run both, then merge the two ranked lists with Reciprocal Rank Fusion
+          (RRF) inside Qdrant. RRF uses positions, not raw scores, because cosine scores and
+          BM25 scores are on different scales and can't be compared directly.
+        """
+        query_filter = _sources_filter(sources)
+        sparse_query = models.SparseVector(indices=sparse.indices, values=sparse.values)
+        if mode == "dense":
+            kwargs: dict[str, object] = {"query": dense, "using": DENSE_VECTOR}
+        elif mode == "sparse":
+            kwargs = {"query": sparse_query, "using": SPARSE_VECTOR}
+        else:
+            kwargs = {
+                "prefetch": [
+                    models.Prefetch(
+                        query=dense, using=DENSE_VECTOR, limit=limit, filter=query_filter
+                    ),
+                    models.Prefetch(
+                        query=sparse_query, using=SPARSE_VECTOR, limit=limit, filter=query_filter
+                    ),
+                ],
+                "query": models.FusionQuery(fusion=models.Fusion.RRF),
+            }
+        response = self._client.query_points(
+            self.collection, query_filter=query_filter, limit=limit, with_payload=True, **kwargs
+        )
+        return [SearchHit(str(p.id), p.score, p.payload or {}) for p in response.points]
+
     def count(self, doc_id: str | None = None) -> int:
         """Number of stored chunks, optionally for one document only."""
         query_filter = _doc_filter(doc_id) if doc_id else None
@@ -165,6 +219,15 @@ def _payload(doc_id: str, chunk: Chunk) -> dict[str, object]:
         "content_hash": chunk.content_hash,
         "text": chunk.text,  # the original chunk text, shown in answers and citations
     }
+
+
+def _sources_filter(sources: Sequence[str] | None) -> models.Filter | None:
+    """Restrict a search to some documents (None or empty = search everything)."""
+    if not sources:
+        return None
+    return models.Filter(
+        must=[models.FieldCondition(key="source", match=models.MatchAny(any=list(sources)))]
+    )
 
 
 def _doc_filter(doc_id: str) -> models.Filter:

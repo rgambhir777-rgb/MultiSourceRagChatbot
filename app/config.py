@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     qdrant_api_key: SecretStr | None = None
     qdrant_collection: str = "knowledge_base"
     qdrant_timeout_s: float = Field(default=30.0, gt=0)
-    retrieve_candidates: int = Field(default=20, gt=0)
+    retrieve_candidates: int = Field(default=10, gt=0)
     rerank_top_k: int = Field(default=5, gt=0)
 
     # ---------- Chunking ----------
@@ -86,14 +86,17 @@ class Settings(BaseSettings):
     postgres_password: SecretStr = SecretStr("change-me-local-only")
     postgres_pool_max_size: int = Field(default=5, gt=0)
     postgres_connect_timeout_s: int = Field(default=5, gt=0)
+    postgres_schema: str = Field(default="public", pattern=r"^[a-z_][a-z0-9_]*$")
 
     # ---------- Ingestion limits ----------
     max_upload_mb: int = Field(default=25, gt=0)
+    max_upload_files: int = Field(default=20, gt=0)  # files per upload request
     # NoDecode: read ".pdf,.md" as plain text; the validator below splits it into a list.
     allowed_file_types: Annotated[list[str], NoDecode] = [".pdf", ".md", ".txt", ".docx"]
     github_max_files: int = Field(default=2000, gt=0)
     github_max_file_kb: int = Field(default=500, gt=0)
     github_clone_timeout_s: float = Field(default=120.0, gt=0)
+    github_max_repo_mb: int = Field(default=200, gt=0)  # checked via the GitHub API before cloning
     github_token: SecretStr | None = None
 
     # ---------- Observability ----------

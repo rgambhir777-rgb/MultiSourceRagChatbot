@@ -317,3 +317,286 @@ append an entry using the template. At the start of every session, read the late
 **Learned:** embeddings & cosine similarity, dense vs sparse, BM25/IDF, named vectors, payload indexes, upserts, deterministic IDs, batching, contextual headers, connection pools, SQL tables, transactions, query parameters vs SQL injection, ON CONFLICT, consistency across two stores, dependency injection with fakes.
 
 **Next:** Phase 3 / Session 4: hybrid retrieval (dense + BM25 → RRF in Qdrant), cross-encoder reranking, and measuring retrieval with hit@k / MRR on a golden set. Start with a plan and wait for "go".
+
+---
+
+## Session 4 / Phase 3 (part 1) — Hybrid retrieval, reranking & metrics (2026-10-27), COMPLETE
+
+Owner asked to run Sessions 4–9 in one go ("go" with no decision answers). Defaults taken:
+- Real OpenAI calls only for manual checks (estimated under $1).
+- Branches pushed, but **not merged into main by Claude**. The owner merges the PRs in order.
+- Demo repo: a public one, because the owner's repo is private (GitHub API returns 404).
+
+**Done:**
+- `app/ingestion/models.py`: shared `SECTION_SEPARATOR` and `with_context(source, section, text)`, used by both ingestion and reranking.
+- `VectorStore.search(dense, sparse, mode, limit, sources)`: modes dense / sparse / hybrid. Hybrid uses Qdrant prefetch + `FusionQuery(RRF)`. Optional `MatchAny` source filter.
+- `app/retrieval/reranker.py`: `Reranker` (FastEmbed `TextCrossEncoder`, ms-marco-MiniLM-L-6-v2, about 80 MB; the first download took about 3 minutes because Hugging Face was slow).
+- `app/retrieval/retriever.py`: `Retriever.retrieve(question, mode, rerank, top_k, sources)` returning `RetrievedChunk` items (with a `citation` property). Logs search and rerank timings.
+- `evals/`: `golden.jsonl` (18 questions: keyword, direct and paraphrase kinds), `metrics.py` (hit@k, MRR, first_correct_rank), `retrieval_eval.py` (`python -m evals.retrieval_eval [--show-misses]`).
+
+**Results (18 questions, top 5):**
+
+| strategy | hit@1 | MRR | median ms |
+|---|---|---|---|
+| dense only | 0.67 | 0.76 | 42 |
+| BM25 only | 0.89 | 0.90 | 55 |
+| hybrid RRF | 0.94 | 0.94 | 47 |
+| hybrid + rerank (20 candidates) | 1.00 | 1.00 | 1660 |
+| hybrid + rerank (**10 candidates**) | **1.00** | **1.00** | **873** |
+
+- Dense alone missed exact codes (E-402 ranked 2nd).
+- BM25 alone missed paraphrases ("wipe back to how it came out of the box" → factory reset: not found).
+
+**Decision (measured):** `RETRIEVE_CANDIDATES` 20 → **10**: same quality at half the latency. Re-check with the eval if the knowledge base grows a lot.
+
+**Verified:** `pytest` 91 passed; `pytest -m integration` 7 passed (new: hybrid+rerank answers first, PDF page numbers, source filter, in a throwaway collection); ruff clean.
+
+**Next:** Session 5: GitHub ingestion + ingestion API with background jobs.
+
+---
+
+## Session 5 / Phase 3 (part 2) — GitHub ingestion & ingestion API (2026-10-27), COMPLETE → PHASE 3 DONE
+
+**Done:**
+- `app/ingestion/github.py`:
+  - `parse_repo_url` accepts only `https://github.com/<owner>/<repo>[.git]` (SSRF-safe).
+  - `check_repo_size` asks the GitHub API and refuses repos over `GITHUB_MAX_REPO_MB` *before* cloning.
+  - `clone_repo` runs `git` via **subprocess** (list args, no shell) with a hard timeout: `--depth=1 --single-branch --no-tags`, `GIT_ALLOW_PROTOCOL=https`, `GIT_LFS_SKIP_SMUDGE=1`, `core.symlinks=false` (set through `GIT_CONFIG_*` env vars), no prompts. Error messages never echo the URL, which could contain a token.
+  - `select_repo_files` skips vendor/build/.git dirs, hidden files, lockfiles, symlinks, binaries (NUL byte), empty and oversized files, and caps the file count.
+  - `remove_tree` handles Git's read-only files on Windows.
+- `CODE_LANGUAGES` (models.py): code/config types accepted **only** from repos (`load_document(..., allow_code=True)`).
+  - Chunking for code: one section (no Markdown heading parsing, since `#` is a comment), split by `RecursiveCharacterTextSplitter` language separators (class/def boundaries).
+- Pipeline: `ingest_repo(url, progress)`; `FileResult.source/name`; progress callbacks; `ingest_file(path, source=, allow_code=)`.
+- CLI: `python -m app.cli ingest-github <url>`.
+- Jobs:
+  - `ingest_jobs` table (`schema.sql`) and `app/db/jobs.py` `JobStore` (create, get, list_recent, mark_running, update_progress, finish, fail, fail_interrupted).
+  - `app/ingestion/jobs.py` `JobRunner`: a single worker thread; records progress, summary and per-file results; RepoError → failed with a clear message; crashes are recorded; upload temp dirs are removed.
+- `app/services.py` `Services`: a lazy, thread-safe container (pool, embedder, reranker, store, registry, jobs, pipeline, job_runner, retriever). Startup stays instant and tests don't need Docker. On first use, jobs left queued/running by a previous process are marked failed ("interrupted").
+- API (`app/api/routes_ingest.py`, all under `/api`):
+  - `POST /ingest/files` (multipart, streamed to disk, size/type/count limits, path-traversal-safe names) → 202 + job
+  - `POST /ingest/github` → 202 + job (bad URL → 422)
+  - `GET /jobs`, `GET /jobs/{id}`, `GET /documents`
+  - Sync DB work runs via `run_in_threadpool`.
+- Settings: `POSTGRES_SCHEMA` (test isolation; `create_pool` creates it), `GITHUB_MAX_REPO_MB=200`, `MAX_UPLOAD_FILES=20`.
+
+**Problems found & fixed:**
+- GitPython refuses `-c` clone options (good: config injection) → used `GIT_CONFIG_*` env vars instead.
+- **GitPython's clone timeout is unsupported on Windows** → switched to subprocess. **GitPython is now unused.** Owner decision: remove it from requirements.txt / the CLAUDE.md stack.
+- Deprecated Starlette status names updated (422 `UNPROCESSABLE_CONTENT`, 413 `CONTENT_TOO_LARGE`).
+
+**Verified:**
+- Live API:
+  - bad URL → 422; .csv upload → 415.
+  - Markdown upload job → succeeded (then removed again).
+  - `pallets/itsdangerous` via the API: 28 files indexed in about 49 s, with progress counting up. Search finds `timed.py` for "expiry time" and `exc.py` for "BadSignature".
+- `pytest` 121 passed. `pytest -m integration` 10 passed (real clone of `octocat/Spoon-Knife`; missing repo → clear error; job lifecycle + interrupted-job recovery). Nothing left behind.
+- Knowledge base now: 4 sample docs + itsdangerous (32 documents, 112 chunks).
+
+**Next:** Session 6: OpenAI answers with citations + token/cost logging + MLflow tracing.
+
+---
+
+## Session 6 / Phase 4 (part 1) — OpenAI answers, cost logging & tracing (2026-10-27), COMPLETE
+
+**Done:**
+- Verified with real calls before building:
+  - `gpt-6.1-sol` with `reasoning_effort=low` + `max_tokens`: OK.
+  - **`gpt-6-luna` `with_structured_output(..., strict=True)`: OK.** The Session 1 open question about structured outputs is resolved.
+- `app/agent/llm.py`:
+  - `make_chat_model(settings, "generator"|"judge", streaming=)`: model, reasoning effort, max_tokens, timeout, retries, base_url, all from Settings.
+  - `MissingAPIKeyError`.
+  - `estimate_cost_usd(settings, usage_by_model)`: handles dated model names.
+- `app/agent/prompts.py`: answer system prompt. It covers sources-only answers, `[n]` citations, the exact not-found sentence, and the injection defence (`<source>` content is data). Sources are numbered and their locations escaped.
+- `app/agent/rag.py`:
+  - `SimpleRag.answer()`: retrieve, `fit_to_budget` (`PROMPT_MAX_TOKENS`), generate, mark cited sources. The usage callback gives tokens and cost, which are logged.
+  - No chunks → not-found answer without an LLM call (no cost).
+  - `@mlflow.trace` plus a `retrieve` span.
+- `app/observability/tracing.py` `setup_tracing()`:
+  - `set_experiment` + `mlflow.langchain.autolog`.
+  - If MLflow is down, tracing is disabled with a warning (the app keeps working).
+  - `TRACING_ENABLED=false` → `mlflow.tracing.disable()` (no local mlruns).
+- API: temporary `POST /api/chat/simple` (503 without a key; 502 on OpenAI errors). `Services.simple_rag()`.
+- Unit tests use LangChain's `GenericFakeChatModel` (no network, no cost). The test settings disable tracing.
+
+**Bug found & fixed:** the API response mapping used the dataclass field `text` where the schema expected `answer`, causing a 500 *after* a successful LLM call. Fixed, and a route unit test was added (it would have caught this).
+
+**Verified (real, about $0.04 total spent on manual checks):**
+- E-207 → correct fix steps citing the PDF (page 1) and handbook.
+- itsdangerous expiry → correct `TimestampSigner`/`max_age` code citing `docs/timed.rst` + `timed.py`.
+- "Capital of France?" → "I couldn't find this in the documents."
+- **Cost ≈ $0.003–0.005 per question**; typical latency **2.3–4.4 s** (retrieval 0.5–1.5 s); occasional OpenAI slowness of about 24 s, seen in traces.
+- MLflow: one trace per request, spans `simple_rag → retrieve → ChatOpenAI` with token usage. OpenAI prompt caching was seen (`cache_read_input_tokens`); our cost estimate ignores the cache discount, so it is conservative.
+- `pytest` 132 passed; ruff clean.
+
+**Next:** Session 7: the LangGraph agent (route → retrieve → grade → rewrite → generate → grounding check).
+
+---
+
+## Session 7 / Phase 4 (part 2) — The LangGraph agent (2026-10-27), COMPLETE → PHASE 4 DONE
+
+**Done:**
+- `app/agent/state.py`:
+  - `AgentState` TypedDict. `messages` uses the add_messages reducer. `steps` uses a resettable `add_steps` reducer, where `None` starts a fresh list each turn.
+  - Structured outputs: `RouteDecision` (route + standalone question), `GradeResult`, `RewrittenQuery`, `GroundingVerdict`.
+- `app/agent/prompts.py`: route / grade / rewrite / grounding / direct prompts, plus a regenerate instruction listing the unsupported claims.
+- `app/agent/judge.py`: a `Judge` protocol and `LLMJudge` (gpt-6-luna `with_structured_output(strict=True)`). **Safe fallbacks:**
+  - route → retrieve
+  - grade → keep all
+  - rewrite → original question
+  - grounding → None (unverified, never "verified")
+  - Out-of-range passage numbers are ignored.
+- `app/agent/nodes.py`: nodes route, retrieve, grade, rewrite, generate (uses `fit_to_budget`; adds the regenerate instruction), check_grounding (sets an explicit `retry_generation` flag), not_found, direct_answer, finalize (appends the AIMessage). The routers are after_route, after_grade and after_grounding; loop limits come from Settings.
+- `app/agent/graph.py`: `build_graph(deps, checkpointer)`, `new_turn()` (resets per-turn fields), `RagAgent.ask(question, thread_id)` → `AgentResult` (answer, sources, grounded, route, standalone question, rewrites, regenerations, steps, usage, cost, latency). `@mlflow.trace`.
+- `Services.agent()` (no checkpointer yet). The Mermaid graph is exported into PLAN.md.
+
+**Verified:**
+- `pytest`: 144 passed. 12 agent tests cover the direct path, normal RAG, rewrite-then-answer, give-up-after-max-rewrites (no generator call), one regeneration, the bounded regeneration limit (marked unverified), an unverifiable answer, conversation memory with InMemorySaver (history reaches the router; counters and steps reset per turn), and judge fallbacks.
+- Real run (about $0.005 total):
+
+| question | path | result | cost |
+|---|---|---|---|
+| "Hi there!" | direct | friendly reply | $0.0003 |
+| "What does error E-207 mean?" | graded 5→2, verified | correct, cites PDF p.1 | $0.0018 |
+| "keeps rebooting at random" (reworded) | verified | C-wire / E-114, 2 sources | $0.0020 |
+| "Capital of France?" | 2 rewrites → not found | no generator call | $0.0004 |
+
+- Grading makes answers **cheaper** than the Session 6 baseline (about $0.002 vs $0.004): fewer passages reach the expensive model.
+- MLflow trace per turn: agent_turn → LangGraph → route 1.7 s, retrieve 1.1 s, grade 1.4 s, generate 2.9 s, check_grounding 1.1 s.
+
+**Known improvement (not done):** the two rewrites for an unanswerable question were identical ("France capital city Paris"). Passing earlier failed queries to the rewriter, or stopping on a repeat, would save one search.
+
+**Next:** Session 8: Postgres checkpointer (memory survives restarts) + streaming `POST /api/chat` (SSE).
+
+---
+
+## Session 8 / Phase 5 (part 1) — Persistent memory & streaming chat API (2026-10-27), COMPLETE
+
+**Design change (better than planned):**
+- LangGraph's **synchronous** `PostgresSaver` is used, and each chat turn runs in **one worker thread**. Events reach the async SSE response through an asyncio queue (`loop.call_soon_threadsafe`).
+- This removes the Windows psycopg-async problem entirely, so the planned `python -m app.serve` launcher is **not needed**. The plain `uvicorn ... --factory` command works.
+- A cancel flag stops the agent when the browser disconnects.
+
+**Done:**
+- `app/memory/checkpointer.py` `create_checkpointer()`: its own small pool (autocommit, prepare_threshold=0, dict_row, schema search_path), `saver.setup()`, and a **deserialisation allow-list** (`JsonPlusSerializer(allowed_msgpack_modules=[RetrievedChunk])`). The allow-list removes LangGraph's "unregistered type" warning; that warning is a security feature.
+- `app/db/sessions.py` `SessionStore` + `chat_sessions` table: create, get, list_recent, record_turn (the first question becomes the title, max 60 chars), delete.
+- `app/db/pool.py` `ensure_schema()` is shared by both pools.
+- Agent:
+  - The `turns` state field (operator.add) records question, answer, sources, grounded and route per turn for the history view. It is kept OUT of `messages`, which are sent back to OpenAI.
+  - `RagAgent.stream(question, thread_id, cancel)` yields `ChatEvent`s: `status`, `token` (answer nodes only), `answer_reset` (before a regeneration), `sources`, `done`.
+  - "Writing the answer" is announced at the first token (LangGraph reports node steps only when a node finishes).
+- `Services`: `sessions()`, `checkpointer()` (its pool is closed on shutdown), and `agent()` now has memory plus a **streaming** generator.
+- API (`app/api/routes_chat.py`):
+  - `POST/GET /api/sessions`, `GET /api/sessions/{id}/history` (reads the checkpoint, no models loaded), `DELETE /api/sessions/{id}` (also deletes the thread's checkpoints).
+  - `POST /api/chat` → SSE with `X-Accel-Buffering: no`; 404 for an unknown session, 409 if the session is busy (`TurnGuard`), 503 without a key. Errors become a friendly `error` event.
+  - `/api/chat/simple` is kept as a baseline.
+
+**Verified (live, about $0.005):**
+- `curl -N` stream: status ×3 → "Writing the answer" → 50 token events → sources → done (grounded true, $0.0017).
+- Follow-up "And how do I fix it?" → standalone "How do I fix error E-114 on the Orbit T2 thermostat?" → correct and verified.
+- **API restarted**, then:
+  - history returned both turns with sources and grounded status,
+  - the title was auto-set,
+  - "What was my first question?" → direct route answered "What does error E-114 mean?".
+- `pytest` 153 passed. New tests cover event order, word-by-word tokens, answer_reset, cancel, saved turns, and the session/chat endpoints (SSE parsing, errors → error event, 404, 409, 422).
+- `pytest -m integration` 12 passed. **New: memory survives a restart using the real PostgresSaver** (fake LLMs, $0) and session store titles/counts. No test schemas were left behind.
+
+**Next:** Session 9: React chat UI.
+
+---
+
+## Session 9 / Phase 5 (part 2) — React chat UI (2026-10-27), COMPLETE → PHASE 5 DONE
+
+**Done (frontend/, React 19 + Vite 8, JavaScript, exact pins, committed lockfile, `.npmrc save-exact`):**
+- `npm install` matched every pin; `npm audit` reported 0 vulnerabilities.
+- Config: `vite.config.js` (dev proxy `/api`, `/health`, `/ready` → 127.0.0.1:8000; Vitest jsdom), `eslint.config.js` (flat config with @eslint/js, react-hooks recommended-latest, react-refresh), `.prettierrc`, `index.html` (inline SVG favicon).
+- `src/api/client.js`: every JSON call, with `ApiError`, timeouts and readable FastAPI `detail` messages.
+- `src/api/sse.js`: an incremental SSE parser (CRLF-safe: it holds a trailing `\r` so a `\r\n` split across chunks can't end an event early) and `streamChat` (fetch POST + ReadableStream + TextDecoder, AbortSignal).
+- `src/lib/citations.js`: `linkCitations` turns `[n]` into `#cite-n` links outside code (so `items[1]` is untouched), plus `timeAgo`.
+- Hooks:
+  - `useSessions`: list/new/select/delete, the last open chat remembered in localStorage (try/catch).
+  - `useChatStream`: a useReducer turn list; events are applied only to a still-streaming turn. Stop works through AbortController. A 90 s idle timeout gives a clear message. The stream of a just-created chat is not cancelled or wiped by that chat's history load (tracked through a `controller.sessionId` + version check).
+  - `useIngestJobs`: upload, add a repo, and poll active jobs every 1.5 s.
+- Components (+ CSS Modules): SessionSidebar, ChatWindow (empty state with example questions), MessageBubble (react-markdown + remark-gfm, citation chips, links `rel="noopener noreferrer"`, `aria-live`), ChatInput (Enter sends, Shift+Enter adds a new line, Stop while busy), StatusSteps, SourceList (expand + highlight on citation click), GroundingBadge, IngestPanel (drag-and-drop or choose files, GitHub URL, jobs with progress bars and failures, documents table).
+- Light and dark design tokens; responsive (the sidebar slides in under 760 px).
+
+**Bugs/issues found & fixed:**
+- Adjacent citations `[1][2]` weren't both linked (a test caught it).
+- React 19 lint `set-state-in-effect`: the initial loads now set state in promise callbacks.
+- Impure state updaters in `useSessions` were refactored.
+- **Streamed turns didn't log tokens/cost** (only `ask()` did): `_log_turn` now runs for both. A CLAUDE.md requirement.
+- The mobile placeholder wrapped and was clipped, so it was shortened.
+
+**Verified:**
+- Frontend: `npm run lint` clean, Prettier clean, `npm test` 26 passed (SSE parser incl. every split position, citations, ChatInput keyboard, MessageBubble incl. **no HTML execution** and safe links, App flow with mocked API), `npm run build` OK (125 KB gzip JS).
+- Backend: `pytest` 153 passed, integration 12 passed, ruff clean.
+- **Real browser (headless) end-to-end:** reopened a conversation; new chat → progress → Stop button → streamed answer "two years [1]" **✓ Verified**, $0.0008; citation click opened the source; sidebar title updated; Knowledge base listed 32 docs and 2 jobs; no horizontal overflow at 390 px. 0 console errors, 0 failed requests. Screenshots reviewed.
+
+**Observation:** `gpt-6.1-sol` sometimes takes about 24 s for a short answer (seen in several traces; other nodes take 1–2 s). This is on OpenAI's side. Options (owner decision, cost/quality trade-off): use gpt-6-luna for generation, or keep and accept.
+
+**Open items for the owner:**
+1. Merge PRs **session-4 → session-9 in order** (merge commits, not squash).
+2. GitPython is unused since Session 5 (subprocess git). Remove it from requirements.txt / the stack table?
+3. Decide on the generator-latency option above.
+4. Confirm the OpenAI project budget limit is set.
+5. Known improvement: the rewriter can repeat the same query (the Session 7 note).
+
+**Next:** Session 10 (Phase 6): Dockerfiles, full compose (api + nginx frontend), healthchecks, smoke test, one-command deploy. Plan first, then wait for "go".
+
+---
+
+## E2E testing with Playwright (2026-10-28), owner-requested
+
+**Done (branch `e2e-playwright`, built on `session-9`):**
+- Owner asked to install Playwright and run detailed tests. `@playwright/test` **1.64.1** was added as an exact-pinned devDependency (Apache-2.0; released 2026-10-14) plus headless Chromium. It is recorded in the CLAUDE.md stack table.
+- `frontend/playwright.config.js` (one worker, HTML + JSON reports, traces on failure, reuses or starts the Vite dev server).
+- `e2e/global-setup.js` (fails clearly if the API isn't ready; snapshots existing conversations) and `e2e/global-teardown.js` (deletes conversations the tests created).
+- `e2e/helpers.js`: **every test fails on any browser console error**, unless a test declares that error as expected.
+- **14 E2E tests**, `npm run e2e`:
+  - chat (8): empty state; cited + verified answer with citation → source; follow-up memory + survives reload; honest not-found; greeting; Stop; GitHub code answer; delete conversation
+  - knowledge base (3): list; upload → indexed → answer from it ("AURORA-42"); validation errors
+  - layout (3): phone menu, dark mode, keyboard
+- Vitest now excludes `e2e/`, ESLint has node globals for E2E files, and outputs are git-ignored (`frontend/e2e-results/`).
+
+**Bugs found by the E2E tests and fixed (all races where an older/slower result overwrote something newer):**
+1. **Upload vanished from the job list**: the Knowledge base page's first job-list load, answering after a fast upload, replaced the list. Fix: `mergeJobs()` keeps jobs the server list doesn't know yet. Unit-tested.
+2. **Error messages lost**: (a) an old client-side error hid a newer server error; (b) a late list load cleared the error. Fix: new actions clear old errors; loading lists never clears errors.
+3. **"+ New chat" was overridden**: the first conversation-list load switched to the latest chat after the user clicked New chat. Fix: once the user chooses, list loads never switch conversations (`userChose` ref).
+4. UX: **"+ New chat" no longer creates empty conversations** on the server; the first message creates it. Unit-tested.
+5. A fast stream finishing before React switched to the new chat let the switch reload (and wipe) it. Fix: `shownSession` ref, plus a StrictMode-safe reset. A regression test was **verified to fail without the fix** (the first version passed either way, so it was corrected).
+
+**Verified:**
+- `npm run e2e`: **14/14 passed, twice in a row** (2.3 min and 2.0 min); about $0.03 of OpenAI per run.
+- Vitest 30/30; ESLint and Prettier clean.
+- All 17 screenshots reviewed. The phone-menu screenshot was taken mid-animation; the test now waits until the sidebar is fully on screen (measured: x = -234 px → 0 px after 400 ms).
+
+**Notes:**
+- Conversation "How long is the warranty?" contains 4 of the **owner's own** questions (12:45–12:48, incl. one in Hindi). An earlier claim that tests wrote them was wrong.
+- The cleanup before E2E run 2 deleted exactly the 8 conversations E2E run 1 created.
+- The uploaded test document `e2e-upload-test.md` stays in the knowledge base (re-runs skip it).
+- A first message that is *stopped* leaves a conversation titled "New chat", because the title is set when a turn completes.
+
+---
+
+## CI pipeline with GitHub Actions (2026-10-28), owner-approved ("go" with defaults)
+
+**Done (branch `ci-pipeline`, built on `e2e-playwright`):**
+- `.github/workflows/ci.yml`: push to `main`, pull requests into `main` (free suites only), and manual runs. **No deployment.**
+  - Jobs: `backend-unit` (ruff format/lint + pytest), `frontend-unit` (ESLint, Prettier, Vitest, build), `integration` (our docker-compose.yml + `pytest -m integration`; on PRs `integration and not openai`), `e2e` (pushes/manual only: compose, ingest sample docs + pallets/itsdangerous, uvicorn, Playwright), and `report`.
+  - `permissions: contents: read`. Concurrency cancels superseded runs. Official actions only, **pinned to commit SHAs**: checkout v7.0.1, setup-python v7.0.0 (v7.1.0 was <2 weeks old), setup-node v7.1.0, upload-artifact v7.0.2, download-artifact v8.0.2, cache v6.1.0.
+  - Caches pip, npm, models (.cache) and the Playwright browser.
+  - The OpenAI key comes from the repo secret `OPENAI_API_KEY`; the E2E job fails early with instructions if it is missing. `GITHUB_TOKEN` is passed to avoid GitHub API rate limits in repo ingestion.
+- `scripts/ci_summary.py` (stdlib only): JUnit XML → Markdown summary (verdict, per-suite table, failures, suites that didn't run) for `$GITHUB_STEP_SUMMARY`, plus a `test-report` artifact. 4 unit tests.
+- Playwright in CI mode (`CI=true`): adds JUnit (`e2e-results/e2e.xml`) and GitHub annotations reporters, plus `forbidOnly`.
+- `.gitignore`: `reports/`, `frontend/reports/`.
+
+**Bug found while verifying (fixed):** after the Postgres container was recreated, the running API kept using dead pooled connections and answered **500** on every database call until it was restarted (`/ready` looked healthy because it opens fresh connections).
+- Fix: `check=ConnectionPool.check_connection` on both pools (app + checkpointer).
+- New `tests/integration/test_db_recovery.py` (drops the pool's connections via `pg_terminate_backend`). **Verified to fail without the fix and pass with it.**
+
+**Verified locally (GitHub can only run the workflow once it's on GitHub):**
+- YAML structure: 3 triggers, 5 jobs, every `uses:` pinned to a 40-character SHA.
+- Every job's commands run locally and produce JUnit files: backend 157 passed; frontend 30 passed; integration 11 (PR mode) / 12 (main mode), then 14 with the recovery tests; E2E in CI mode 14/14 (1.5 min).
+- `docker compose up -d --wait` works.
+- `ci_summary.py` on the real files: "✅ All tests passed (213 tests in 4 suites)".
+
+**Owner next steps:** add the `OPENAI_API_KEY` repository secret; merge the open branches in order (session-4 … session-9, e2e-playwright, ci-pipeline). The first CI run will happen on the pull request (free suites) and then on `main` (all suites).
