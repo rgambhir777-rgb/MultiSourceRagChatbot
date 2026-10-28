@@ -541,3 +541,36 @@ Owner asked to run Sessions 4–9 in one go ("go" with no decision answers). Def
 5. Known improvement: the rewriter can repeat the same query (the Session 7 note).
 
 **Next:** Session 10 (Phase 6): Dockerfiles, full compose (api + nginx frontend), healthchecks, smoke test, one-command deploy. Plan first, then wait for "go".
+
+---
+
+## E2E testing with Playwright (2026-10-28), owner-requested
+
+**Done (branch `e2e-playwright`, built on `session-9`):**
+- Owner asked to install Playwright and run detailed tests. `@playwright/test` **1.64.1** was added as an exact-pinned devDependency (Apache-2.0; released 2026-10-14) plus headless Chromium. It is recorded in the CLAUDE.md stack table.
+- `frontend/playwright.config.js` (one worker, HTML + JSON reports, traces on failure, reuses or starts the Vite dev server).
+- `e2e/global-setup.js` (fails clearly if the API isn't ready; snapshots existing conversations) and `e2e/global-teardown.js` (deletes conversations the tests created).
+- `e2e/helpers.js`: **every test fails on any browser console error**, unless a test declares that error as expected.
+- **14 E2E tests**, `npm run e2e`:
+  - chat (8): empty state; cited + verified answer with citation → source; follow-up memory + survives reload; honest not-found; greeting; Stop; GitHub code answer; delete conversation
+  - knowledge base (3): list; upload → indexed → answer from it ("AURORA-42"); validation errors
+  - layout (3): phone menu, dark mode, keyboard
+- Vitest now excludes `e2e/`, ESLint has node globals for E2E files, and outputs are git-ignored (`frontend/e2e-results/`).
+
+**Bugs found by the E2E tests and fixed (all races where an older/slower result overwrote something newer):**
+1. **Upload vanished from the job list**: the Knowledge base page's first job-list load, answering after a fast upload, replaced the list. Fix: `mergeJobs()` keeps jobs the server list doesn't know yet. Unit-tested.
+2. **Error messages lost**: (a) an old client-side error hid a newer server error; (b) a late list load cleared the error. Fix: new actions clear old errors; loading lists never clears errors.
+3. **"+ New chat" was overridden**: the first conversation-list load switched to the latest chat after the user clicked New chat. Fix: once the user chooses, list loads never switch conversations (`userChose` ref).
+4. UX: **"+ New chat" no longer creates empty conversations** on the server; the first message creates it. Unit-tested.
+5. A fast stream finishing before React switched to the new chat let the switch reload (and wipe) it. Fix: `shownSession` ref, plus a StrictMode-safe reset. A regression test was **verified to fail without the fix** (the first version passed either way, so it was corrected).
+
+**Verified:**
+- `npm run e2e`: **14/14 passed, twice in a row** (2.3 min and 2.0 min); about $0.03 of OpenAI per run.
+- Vitest 30/30; ESLint and Prettier clean.
+- All 17 screenshots reviewed. The phone-menu screenshot was taken mid-animation; the test now waits until the sidebar is fully on screen (measured: x = -234 px → 0 px after 400 ms).
+
+**Notes:**
+- Conversation "How long is the warranty?" contains 4 of the **owner's own** questions (12:45–12:48, incl. one in Hindi). An earlier claim that tests wrote them was wrong.
+- The cleanup before E2E run 2 deleted exactly the 8 conversations E2E run 1 created.
+- The uploaded test document `e2e-upload-test.md` stays in the knowledge base (re-runs skip it).
+- A first message that is *stopped* leaves a conversation titled "New chat", because the title is set when a turn completes.

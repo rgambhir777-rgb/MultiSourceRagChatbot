@@ -194,6 +194,12 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 - **Multi-stage build:** A Dockerfile that builds in one stage and copies only what's needed into a small final image.
 - **ruff:** A very fast Python linter + formatter.
 - **pytest:** The Python testing framework. *Unit tests* check small pieces in isolation. *Integration tests* check pieces working together (with real services).
+- **End-to-end (E2E) test:** A test that drives the real app the way a person would (a real browser clicking and typing), through the UI, API, databases and the LLM. It catches problems unit tests can't, like two parts that each work alone but clash together.
+- **Playwright:** The tool that runs our E2E tests. It controls a headless Chromium browser, takes screenshots and records a step-by-step "trace" when a test fails.
+- **Headless browser:** A real browser running without a visible window, so tests can run unattended.
+- **Race condition:** A bug that depends on timing: which of two things finishes first. Our E2E tests found three, all versions of "a slow first load overwrites something newer the user just did".
+- **Flaky test:** A test that sometimes passes and sometimes fails without any code change, usually because of timing. We run the E2E suite twice to check it's stable.
+- **Regression test that proves itself:** After writing a test for a bug, remove the fix and check the test *fails*. Otherwise the test may guard nothing (this happened with our StrictMode test until we fixed it).
 - **Mock / fake:** A stand-in object used in tests (e.g., a fake LLM that returns fixed answers).
 - **Side effect at import:** When merely importing a library *does* something (here: `magika`, used by MarkItDown, copied our whole `.env` into the environment). Good libraries avoid it; we defend against it with a test.
 - **Environment inheritance:** A program you start (a "child process") receives a copy of your environment variables. That's why secrets must not sit in `os.environ` unnecessarily.

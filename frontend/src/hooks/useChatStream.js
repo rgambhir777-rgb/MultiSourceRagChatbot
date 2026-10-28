@@ -83,6 +83,9 @@ export function useChatStream(sessionId, { onTurnDone } = {}) {
   const [state, dispatch] = useReducer(reducer, { turns: [], loading: false, busy: false });
   const controller = useRef(null); // {abort: AbortController, sessionId: string} while streaming
   const version = useRef(0); // bumps when a turn starts, so a late history load can't wipe it
+  // Which conversation the turns on screen belong to. A message sent to a brand-new chat
+  // claims it before React has even switched to that chat, so the switch must not reload it.
+  const shownSession = useRef(undefined);
   const onTurnDoneRef = useRef(onTurnDone);
   useEffect(() => {
     onTurnDoneRef.current = onTurnDone;
@@ -90,16 +93,16 @@ export function useChatStream(sessionId, { onTurnDone } = {}) {
 
   // Load the conversation when another one is opened; cancel any stream of the old one.
   useEffect(() => {
-    const running = controller.current;
-    // "New chat" + first message: the stream for this brand-new conversation already started.
-    if (running && running.sessionId === sessionId) return undefined;
-    running?.abort.abort();
+    if (shownSession.current === sessionId) return undefined; // already on screen
+    shownSession.current = sessionId;
+    controller.current?.abort.abort();
     if (!sessionId) {
       dispatch({ type: "loaded", turns: [] });
       return undefined;
     }
     const loadVersion = ++version.current;
     let cancelled = false;
+    let settled = false;
     dispatch({ type: "loading" });
     getHistory(sessionId)
       .then((history) => {
@@ -109,9 +112,15 @@ export function useChatStream(sessionId, { onTurnDone } = {}) {
       })
       .catch(() => {
         if (!cancelled && version.current === loadVersion) dispatch({ type: "loaded", turns: [] });
+      })
+      .finally(() => {
+        settled = true;
       });
     return () => {
       cancelled = true;
+      // Cancelled before the history arrived (e.g. React's development double-run of effects):
+      // forget the claim, so the next run loads it again instead of waiting forever.
+      if (!settled && shownSession.current === sessionId) shownSession.current = undefined;
     };
   }, [sessionId]);
 
@@ -125,6 +134,7 @@ export function useChatStream(sessionId, { onTurnDone } = {}) {
       version.current += 1;
       const abort = new AbortController();
       controller.current = { abort, sessionId: targetSession };
+      shownSession.current = targetSession;
       dispatch({
         type: "start",
         turn: {

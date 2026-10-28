@@ -1,5 +1,6 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { configDefaults } from "vitest/config";
 
 // The browser only ever calls the relative path /api. In development, Vite's dev server
 // forwards those requests to the Python API, so the browser sees one origin (no CORS).
@@ -20,6 +21,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.js"],
+    exclude: [...configDefaults.exclude, "e2e/**"], // Playwright tests run separately
     css: { modules: { classNameStrategy: "non-scoped" } },
   },
 });

@@ -31,6 +31,7 @@ export default function IngestPanel() {
 
   const submitRepo = async (event) => {
     event.preventDefault();
+    setLocalError(null); // show this action's result, not an older message
     if (await addRepo(repoUrl)) setRepoUrl("");
   };
 

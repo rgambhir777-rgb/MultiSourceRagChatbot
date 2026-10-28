@@ -63,13 +63,12 @@ export default function App() {
           sessions.select(id);
           setView("chat");
         })}
-        onNew={closeMenuThen(async () => {
+        onNew={closeMenuThen(() => {
+          // The conversation is created on the server when its first message is sent
+          // (handleSend), so clicking "New chat" never leaves empty conversations behind.
           setView("chat");
-          try {
-            await sessions.newChat();
-          } catch (err) {
-            setSendError(err.message);
-          }
+          setSendError(null);
+          sessions.select(null);
         })}
         onDelete={sessions.remove}
         onViewChange={closeMenuThen(setView)}

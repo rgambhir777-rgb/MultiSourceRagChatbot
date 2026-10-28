@@ -35,21 +35,35 @@ export function useSessions() {
   const [error, setError] = useState(null);
   // The latest activeId, readable inside async callbacks without re-creating them.
   const activeRef = useRef(activeId);
+  // Set once the user picks a conversation (or "New chat"): from then on, loading the list
+  // must never switch conversations behind their back.
+  const userChose = useRef(false);
 
-  const select = useCallback((id) => {
+  const open = useCallback((id) => {
     activeRef.current = id;
     setActiveId(id);
     saveActiveId(id);
   }, []);
 
+  /** Open a conversation because the user asked for it (null = a new, empty chat). */
+  const select = useCallback(
+    (id) => {
+      userChose.current = true;
+      open(id);
+    },
+    [open],
+  );
+
   const applyList = useCallback(
     (list) => {
       setSessions(list);
       setError(null);
-      // The remembered conversation may have been deleted in the meantime.
-      if (!list.some((s) => s.id === activeRef.current)) select(list[0]?.id ?? null);
+      // On first load, open the remembered conversation, or the latest one if it's gone.
+      if (!userChose.current && !list.some((s) => s.id === activeRef.current)) {
+        open(list[0]?.id ?? null);
+      }
     },
-    [select],
+    [open],
   );
 
   const refresh = useCallback(async () => {

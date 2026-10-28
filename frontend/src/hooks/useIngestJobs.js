@@ -7,6 +7,18 @@ const isActive = (job) => job.status === "queued" || job.status === "running";
 const loadAll = () => Promise.all([listJobs(), listDocuments()]);
 
 /**
+ * Combine a job list from the server with the jobs already shown. A list that was requested
+ * before an upload may arrive after it: keep jobs the server list doesn't know yet (newest
+ * first), so a fresh upload never disappears from the page.
+ * @param {Array<object>} fromServer
+ * @param {Array<object>} shown
+ */
+export function mergeJobs(fromServer, shown) {
+  const known = new Set(fromServer.map((job) => job.id));
+  return [...shown.filter((job) => !known.has(job.id)), ...fromServer];
+}
+
+/**
  * Ingestion jobs (uploads, GitHub repos) and the indexed documents.
  * While any job is queued or running, its status is polled every 1.5 s.
  * @returns {{jobs: Array<object>, documents: Array<object>, error: string|null,
@@ -23,10 +35,11 @@ export function useIngestJobs() {
     jobsRef.current = jobs;
   }, [jobs]);
 
+  // Loading lists never clears the error message: a slow load finishing after the user's
+  // action would otherwise wipe that action's (newer) error from the screen.
   const apply = useCallback(([jobList, docList]) => {
-    setJobs(jobList);
+    setJobs((shown) => mergeJobs(jobList, shown));
     setDocuments(docList);
-    setError(null);
   }, []);
 
   const refresh = useCallback(async () => {

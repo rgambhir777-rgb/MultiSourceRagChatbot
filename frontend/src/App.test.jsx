@@ -74,6 +74,14 @@ describe("App", () => {
     expect(screen.getByText("g.pdf, page 1")).toBeInTheDocument();
   });
 
+  it("New chat does not create an empty conversation on the server", async () => {
+    client.listSessions.mockResolvedValue([{ ...SESSION, title: "Old chat", turn_count: 1 }]);
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "+ New chat" }));
+    expect(await screen.findByRole("heading", { name: "Ask your documents" })).toBeVisible();
+    expect(client.createSession).not.toHaveBeenCalled();
+  });
+
   it("shows a friendly error when the stream fails", async () => {
     client.listSessions.mockResolvedValue([SESSION]);
     streamChat.mockImplementation(async ({ onEvent }) => {
@@ -107,5 +115,34 @@ describe("App", () => {
     render(<App />);
     expect(await screen.findByText(/Two years/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Warranty" })).toBeInTheDocument();
+  });
+});
+
+describe("App in React StrictMode (development double-run of effects)", () => {
+  it("still loads the open conversation", async () => {
+    const { StrictMode } = await import("react");
+    // As after a page reload: the last open conversation is remembered, so its history load
+    // starts at mount, exactly when StrictMode runs effects twice.
+    window.localStorage.setItem("ragchat.activeSession", SESSION.id);
+    client.listSessions.mockResolvedValue([{ ...SESSION, title: "Warranty", turn_count: 1 }]);
+    client.getHistory.mockResolvedValue({
+      session: SESSION,
+      turns: [
+        {
+          question: "Q?",
+          answer: "Two years [1].",
+          sources: [],
+          grounded: true,
+          route: "retrieve",
+        },
+      ],
+    });
+    render(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+    );
+    expect(await screen.findByText(/Two years/)).toBeInTheDocument();
+    expect(screen.queryByText("Loading conversation…")).not.toBeInTheDocument();
   });
 });
