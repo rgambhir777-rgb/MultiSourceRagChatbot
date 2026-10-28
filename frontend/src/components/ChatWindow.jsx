@@ -10,7 +10,7 @@ const EXAMPLES = [
   "How do I make a signed token expire with itsdangerous?",
 ];
 
-/** The open conversation: its turns, an empty state with example questions, and the input. */
+/** The open conversation: the input at the top, then its turns (or example questions). */
 export default function ChatWindow({ title, turns, busy, loading, onSend, onStop }) {
   const endRef = useRef(null);
   const last = turns.at(-1);
@@ -25,6 +25,14 @@ export default function ChatWindow({ title, turns, busy, loading, onSend, onStop
       <header className={styles.header}>
         <h1 className={styles.title}>{title}</h1>
       </header>
+
+      {/* The input sits at the top, right under the title, so it's always in the same place. */}
+      <div className={styles.composer}>
+        <div className={styles.composerInner}>
+          <ChatInput onSend={onSend} onStop={onStop} busy={busy} disabled={loading} />
+          <p className={styles.hint}>Enter to send · Shift+Enter for a new line</p>
+        </div>
+      </div>
 
       <div className={styles.scroll}>
         <div className={styles.content}>
@@ -58,11 +66,6 @@ export default function ChatWindow({ title, turns, busy, loading, onSend, onStop
           ))}
           <div ref={endRef} />
         </div>
-      </div>
-
-      <div className={styles.footer}>
-        <ChatInput onSend={onSend} onStop={onStop} busy={busy} disabled={loading} />
-        <p className={styles.hint}>Enter to send · Shift+Enter for a new line</p>
       </div>
     </div>
   );

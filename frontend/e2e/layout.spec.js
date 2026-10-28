@@ -1,5 +1,5 @@
 // Layout and interaction details: phone screens, dark mode, keyboard behaviour.
-import { expect, shot, test } from "./helpers.js";
+import { expect, newChat, shot, test } from "./helpers.js";
 
 test("phone layout: the menu opens the sidebar and nothing scrolls sideways", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 780 });
@@ -34,7 +34,11 @@ test("dark mode follows the system setting", async ({ page }) => {
 
 test("keyboard: Shift+Enter adds a line, Enter on empty text sends nothing", async ({ page }) => {
   await page.goto("/");
+  // Wait until the page has settled (the input is briefly disabled while the latest
+  // conversation loads; keys typed then are dropped, which made this test flaky in CI).
+  await newChat(page);
   const box = page.getByLabel(/ask a question/i);
+  await expect(box).toBeEnabled();
   await box.fill("first line");
   await box.press("Shift+Enter");
   await box.pressSequentially("second line");

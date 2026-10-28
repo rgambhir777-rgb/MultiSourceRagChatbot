@@ -1,6 +1,7 @@
 .window {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  /* title, input, then the conversation takes the rest and scrolls */
+  grid-template-rows: auto auto minmax(0, 1fr);
   height: 100%;
   min-width: 0;
 }
@@ -38,7 +39,7 @@
 
 .empty {
   text-align: center;
-  padding: 8vh 0 0;
+  padding: 4vh 0 0;
 }
 
 .empty h2 {
@@ -72,11 +73,15 @@
   color: var(--accent);
 }
 
-.footer {
-  width: 100%;
+.composer {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.composerInner {
   max-width: 820px;
   margin: 0 auto;
-  padding: 8px 24px 16px;
+  padding: 12px 24px 10px;
 }
 
 .hint {
@@ -88,7 +93,7 @@
 
 @media (max-width: 640px) {
   .content,
-  .footer {
+  .composerInner {
     padding-left: 16px;
     padding-right: 16px;
   }
