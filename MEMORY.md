@@ -600,3 +600,22 @@ Owner asked to run Sessions 4–9 in one go ("go" with no decision answers). Def
 - `ci_summary.py` on the real files: "✅ All tests passed (213 tests in 4 suites)".
 
 **Owner next steps:** add the `OPENAI_API_KEY` repository secret; merge the open branches in order (session-4 … session-9, e2e-playwright, ci-pipeline). The first CI run will happen on the pull request (free suites) and then on `main` (all suites).
+
+---
+
+## UI tweak: input box at the top + first CI run on `main` (2026-10-28), owner-approved ("go")
+
+**Context:** the owner merged PR #4 (`ci-pipeline`, which includes everything since Session 4) into `main`. The first CI run on `main` passed 4 of 5 jobs. The E2E job failed **1 of 14** tests: the keyboard test was *flaky*.
+
+**Flaky test, root cause:** when the page opens, it loads the latest saved conversation, and the input is disabled while that happens. The test typed immediately; the Shift+Enter and "second line" keys hit the disabled box and were dropped. CI had 7 saved chats, so loading was slower and the race showed up there.
+- Fix: the test first runs `newChat(page)` and waits for the box to be enabled. Verified with 10 repeats in a row.
+
+**Done (branch `ui-input-top`):**
+- `ChatWindow.jsx` / `.module.css`: the order is now title → input (+ hint) → conversation (scrolls). The empty-state gap was reduced (8vh → 4vh). Messages stay in chronological order (owner's choice: "Input box at the top", not newest-first).
+- New `ChatWindow.test.jsx`: 2 tests that the input comes before the welcome text and before the conversation.
+
+**Verified locally:** ESLint, Prettier, Vitest 32/32, build OK; Playwright CI mode 14/14 (2.4 min); keyboard test 10/10 repeats.
+
+**Gotcha:** switching git branches can touch `vite.config.js`. Vite then restarts itself in place, and after that restart its `/api` proxy stopped working (the page got HTML instead of JSON, so 12 E2E tests failed). Fix: stop and restart `npm run dev`.
+
+**How CI results are read:** through the GitHub REST API, using the GitHub login saved by Git Credential Manager (owner-approved; read-only, token never printed). The GitHub CLI is not installed.

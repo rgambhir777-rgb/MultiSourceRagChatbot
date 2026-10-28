@@ -198,7 +198,7 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 - **Playwright:** The tool that runs our E2E tests. It controls a headless Chromium browser, takes screenshots and records a step-by-step "trace" when a test fails.
 - **Headless browser:** A real browser running without a visible window, so tests can run unattended.
 - **Race condition:** A bug that depends on timing: which of two things finishes first. Our E2E tests found three, all versions of "a slow first load overwrites something newer the user just did".
-- **Flaky test:** A test that sometimes passes and sometimes fails without any code change, usually because of timing. We run the E2E suite twice to check it's stable.
+- **Flaky test:** A test that sometimes passes and sometimes fails without any code change, usually because of timing. We run the E2E suite twice to check it's stable. The fix is to wait for a visible "ready" signal (e.g. an enabled input) before acting, never a fixed sleep.
 - **Regression test that proves itself:** After writing a test for a bug, remove the fix and check the test *fails*. Otherwise the test may guard nothing (this happened with our StrictMode test until we fixed it).
 - **CI (Continuous Integration):** Automatically running all tests on a clean machine whenever code is pushed, so problems are caught before they pile up. Ours runs on GitHub Actions.
 - **Workflow / job / step / runner:** A *workflow* (`.github/workflows/ci.yml`) is a pipeline. It has *jobs* (which can run in parallel), each made of *steps* (commands or actions), executed on a *runner* (a fresh virtual machine GitHub provides).
