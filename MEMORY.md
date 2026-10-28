@@ -574,3 +574,29 @@ Owner asked to run Sessions 4–9 in one go ("go" with no decision answers). Def
 - The cleanup before E2E run 2 deleted exactly the 8 conversations E2E run 1 created.
 - The uploaded test document `e2e-upload-test.md` stays in the knowledge base (re-runs skip it).
 - A first message that is *stopped* leaves a conversation titled "New chat", because the title is set when a turn completes.
+
+---
+
+## CI pipeline with GitHub Actions (2026-10-28), owner-approved ("go" with defaults)
+
+**Done (branch `ci-pipeline`, built on `e2e-playwright`):**
+- `.github/workflows/ci.yml`: push to `main`, pull requests into `main` (free suites only), and manual runs. **No deployment.**
+  - Jobs: `backend-unit` (ruff format/lint + pytest), `frontend-unit` (ESLint, Prettier, Vitest, build), `integration` (our docker-compose.yml + `pytest -m integration`; on PRs `integration and not openai`), `e2e` (pushes/manual only: compose, ingest sample docs + pallets/itsdangerous, uvicorn, Playwright), and `report`.
+  - `permissions: contents: read`. Concurrency cancels superseded runs. Official actions only, **pinned to commit SHAs**: checkout v7.0.1, setup-python v7.0.0 (v7.1.0 was <2 weeks old), setup-node v7.1.0, upload-artifact v7.0.2, download-artifact v8.0.2, cache v6.1.0.
+  - Caches pip, npm, models (.cache) and the Playwright browser.
+  - The OpenAI key comes from the repo secret `OPENAI_API_KEY`; the E2E job fails early with instructions if it is missing. `GITHUB_TOKEN` is passed to avoid GitHub API rate limits in repo ingestion.
+- `scripts/ci_summary.py` (stdlib only): JUnit XML → Markdown summary (verdict, per-suite table, failures, suites that didn't run) for `$GITHUB_STEP_SUMMARY`, plus a `test-report` artifact. 4 unit tests.
+- Playwright in CI mode (`CI=true`): adds JUnit (`e2e-results/e2e.xml`) and GitHub annotations reporters, plus `forbidOnly`.
+- `.gitignore`: `reports/`, `frontend/reports/`.
+
+**Bug found while verifying (fixed):** after the Postgres container was recreated, the running API kept using dead pooled connections and answered **500** on every database call until it was restarted (`/ready` looked healthy because it opens fresh connections).
+- Fix: `check=ConnectionPool.check_connection` on both pools (app + checkpointer).
+- New `tests/integration/test_db_recovery.py` (drops the pool's connections via `pg_terminate_backend`). **Verified to fail without the fix and pass with it.**
+
+**Verified locally (GitHub can only run the workflow once it's on GitHub):**
+- YAML structure: 3 triggers, 5 jobs, every `uses:` pinned to a 40-character SHA.
+- Every job's commands run locally and produce JUnit files: backend 157 passed; frontend 30 passed; integration 11 (PR mode) / 12 (main mode), then 14 with the recovery tests; E2E in CI mode 14/14 (1.5 min).
+- `docker compose up -d --wait` works.
+- `ci_summary.py` on the real files: "✅ All tests passed (213 tests in 4 suites)".
+
+**Owner next steps:** add the `OPENAI_API_KEY` repository secret; merge the open branches in order (session-4 … session-9, e2e-playwright, ci-pipeline). The first CI run will happen on the pull request (free suites) and then on `main` (all suites).

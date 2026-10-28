@@ -75,6 +75,7 @@ code readable, and never skip the concept behind a change.
 | Frontend tests | Vitest + React Testing Library + jest-dom + jsdom | 5.0.5 / 16.3.3 / 7.0.1 / 30.1.3 | MIT |
 | Frontend lint / format | ESLint (+ react-hooks, react-refresh plugins) + Prettier | 10.13.0 / 3.9.10 | MIT |
 | End-to-end (E2E) tests | Playwright (`@playwright/test`, headless Chromium) driving the real app (owner-requested 2026-10-28) | 1.64.1 | Apache-2.0 |
+| CI (tests + report, no deployment) | GitHub Actions: `.github/workflows/ci.yml`, official `actions/*` only, pinned to commit SHAs (owner-requested 2026-10-28) | — | GitHub service (free minutes for private repos) |
 | Frontend serving (prod) | nginx: serves the built files and proxies `/api` to the backend | image `nginx:1.30.6-alpine` (build stage `node:24.22.0-alpine`) | BSD-2 |
 | Tracing | MLflow Tracing (app: `mlflow-tracing`; server: `ghcr.io/mlflow/mlflow:v3.17.1`) | 3.17.1 | Apache-2.0 |
 | Logging | structlog (JSON logs) | 26.1.0 | MIT / Apache-2.0 |

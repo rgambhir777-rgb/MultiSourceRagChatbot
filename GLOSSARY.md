@@ -200,6 +200,13 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 - **Race condition:** A bug that depends on timing: which of two things finishes first. Our E2E tests found three, all versions of "a slow first load overwrites something newer the user just did".
 - **Flaky test:** A test that sometimes passes and sometimes fails without any code change, usually because of timing. We run the E2E suite twice to check it's stable.
 - **Regression test that proves itself:** After writing a test for a bug, remove the fix and check the test *fails*. Otherwise the test may guard nothing (this happened with our StrictMode test until we fixed it).
+- **CI (Continuous Integration):** Automatically running all tests on a clean machine whenever code is pushed, so problems are caught before they pile up. Ours runs on GitHub Actions.
+- **Workflow / job / step / runner:** A *workflow* (`.github/workflows/ci.yml`) is a pipeline. It has *jobs* (which can run in parallel), each made of *steps* (commands or actions), executed on a *runner* (a fresh virtual machine GitHub provides).
+- **Repository secret:** An encrypted value stored in GitHub (e.g. `OPENAI_API_KEY`) that workflows can use without it ever appearing in code or logs.
+- **Pinning an action to a SHA:** Referring to an action by its exact commit (`@3d3c42e…`) instead of a movable label (`@v7`), so nobody can change the code your pipeline runs.
+- **JUnit XML:** A standard test-result file format. pytest, Vitest and Playwright all write it; our `scripts/ci_summary.py` turns those files into one report.
+- **Artifact (CI):** A file a CI run keeps for download afterwards (here: test reports, screenshots, logs; kept 14 days).
+- **Connection health check (pool):** The pool tests a database connection before lending it out and replaces it if dead. Without it, the API kept failing after Postgres restarted (a bug found while building CI).
 - **Mock / fake:** A stand-in object used in tests (e.g., a fake LLM that returns fixed answers).
 - **Side effect at import:** When merely importing a library *does* something (here: `magika`, used by MarkItDown, copied our whole `.env` into the environment). Good libraries avoid it; we defend against it with a test.
 - **Environment inheritance:** A program you start (a "child process") receives a copy of your environment variables. That's why secrets must not sit in `os.environ` unnecessarily.

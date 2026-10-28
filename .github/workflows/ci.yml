@@ -1,0 +1,265 @@
+# CI pipeline: run every test suite on GitHub's servers and publish a test report.
+# Nothing is deployed.
+#
+#   push to main        → all suites, incl. the ones that call OpenAI (≈ $0.03 per run)
+#   pull request → main → the free suites only (no OpenAI calls, no secret needed)
+#   manual run          → like a push to main (Actions tab → CI → Run workflow)
+#
+# Jobs (the four test jobs run in parallel):
+#   backend-unit   ruff format/lint + pytest unit tests
+#   frontend-unit  ESLint, Prettier, Vitest, production build
+#   integration    our docker-compose.yml (Qdrant, Postgres, MLflow) + pytest -m integration
+#   e2e            services + API + sample data, then Playwright in headless Chromium
+#   report         one summary table on the run page, plus downloadable reports
+#
+# Security: the workflow can only read the repository; every action is an official GitHub
+# action pinned to an exact commit (the comment shows its version); the OpenAI key comes only
+# from the encrypted repository secret OPENAI_API_KEY and is never printed.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch cancels the older run (saves minutes and OpenAI calls).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "24"
+  # Password for the throwaway Postgres container that exists only during a CI run.
+  POSTGRES_PASSWORD: ci-only-throwaway-password
+  # Downloaded models and tokenizer files go here, so they can be cached between runs.
+  FASTEMBED_CACHE_DIR: .cache/fastembed
+  TIKTOKEN_CACHE_DIR: ${{ github.workspace }}/.cache/tiktoken
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  backend-unit:
+    name: Backend · lint + unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Restore cached models (embeddings, reranker, tokenizer)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache
+          key: models-${{ runner.os }}-${{ hashFiles('requirements.txt', 'app/config.py') }}
+      - name: Check formatting (ruff format)
+        run: ruff format --check .
+      - name: Lint (ruff check)
+        run: ruff check .
+      - name: Unit tests (pytest)
+        run: pytest --junitxml=reports/backend-unit.xml
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: results-backend-unit
+          path: reports/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  frontend-unit:
+    name: Frontend · lint + unit tests + build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install exact dependencies from the lockfile
+        run: npm ci
+      - name: Lint (ESLint)
+        run: npm run lint
+      - name: Check formatting (Prettier)
+        run: npm run format:check
+      - name: Unit tests (Vitest)
+        run: npx vitest run --reporter=default --reporter=junit --outputFile.junit=reports/frontend-unit.xml
+      - name: Production build
+        run: npm run build
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: results-frontend-unit
+          path: frontend/reports/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  integration:
+    name: Integration · real Qdrant, Postgres, MLflow
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      # GitHub's per-run token: avoids the anonymous GitHub API rate limit in repo-ingest tests.
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Restore cached models (embeddings, reranker, tokenizer)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache
+          key: models-${{ runner.os }}-${{ hashFiles('requirements.txt', 'app/config.py') }}
+      - name: Start Qdrant, Postgres and MLflow (our docker-compose.yml)
+        run: docker compose up -d --wait --wait-timeout 240
+      - name: Integration tests (pytest)
+        run: |
+          mkdir -p reports
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            markers="integration and not openai"   # pull requests: free tests only
+          else
+            markers="integration"
+          fi
+          pytest -m "$markers" --junitxml=reports/integration.xml
+      - name: Save service logs
+        if: failure()
+        run: docker compose logs --no-color > reports/docker-services.log 2>&1
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: results-integration
+          path: reports/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  e2e:
+    name: End-to-end · Playwright browser tests
+    # Real OpenAI answers cost money: only on pushes to main and manual runs.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Check that the OpenAI key secret is set
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "::error::Add your OpenAI key as a repository secret named OPENAI_API_KEY (repo Settings → Secrets and variables → Actions → New repository secret)."
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Restore cached models (embeddings, reranker, tokenizer)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache
+          key: models-${{ runner.os }}-${{ hashFiles('requirements.txt', 'app/config.py') }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Restore cached Playwright browser
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+      - name: Install Chromium and its system libraries
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Start Qdrant, Postgres and MLflow (our docker-compose.yml)
+        run: docker compose up -d --wait --wait-timeout 240
+      - name: Index the test data (sample docs + pallets/itsdangerous)
+        run: |
+          python -m app.cli ingest data/sample_docs
+          python -m app.cli ingest-github https://github.com/pallets/itsdangerous
+      - name: Start the API and wait until it is ready
+        run: |
+          mkdir -p reports
+          nohup python -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000 \
+            > reports/api.log 2>&1 &
+          curl --silent --show-error --fail --retry 30 --retry-delay 2 --retry-connrefused \
+            http://127.0.0.1:8000/ready
+      - name: End-to-end tests (Playwright)
+        working-directory: frontend
+        run: npx playwright test
+      - name: Upload Playwright report, screenshots and API log
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-report
+          path: |
+            frontend/e2e-results/
+            reports/api.log
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: results-e2e
+          path: frontend/e2e-results/e2e.xml
+          retention-days: 14
+          if-no-files-found: ignore
+
+  report:
+    name: Test report
+    if: always()
+    needs: [backend-unit, frontend-unit, integration, e2e]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Collect every suite's results
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: results-*
+          path: reports
+          merge-multiple: true
+      - name: Write the summary to the run page
+        run: |
+          expected="backend-unit,frontend-unit,integration"
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then expected="$expected,e2e"; fi
+          python scripts/ci_summary.py reports --expect "$expected" | tee reports/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the combined report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-report
+          path: reports/
+          retention-days: 14

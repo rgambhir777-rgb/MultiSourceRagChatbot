@@ -38,6 +38,10 @@ def create_pool(settings: Settings, schema: str | None = None) -> ConnectionPool
         kwargs=connect_kwargs,
         open=True,
         name="ragbot",
+        # Test each connection before lending it out and replace dead ones, so the app
+        # recovers by itself when Postgres restarts (otherwise every query fails until the
+        # API is restarted too).
+        check=ConnectionPool.check_connection,
     )
     pool.wait(timeout=settings.postgres_connect_timeout_s)  # raises PoolTimeout if DB is down
     ensure_schema(pool, schema)

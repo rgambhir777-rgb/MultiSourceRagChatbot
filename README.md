@@ -169,6 +169,7 @@ Risks were assessed up front, including API cost runaway, key leakage, rate limi
 
 ## Engineering practices
 
+- **Continuous integration.** Every push to `main` runs all four test suites on GitHub Actions (backend unit, frontend unit, integration against real Qdrant/Postgres/MLflow containers, and Playwright end-to-end tests in a real browser) and publishes a combined test report. Pull requests run the free suites. Actions are pinned to exact commits, and the workflow is read-only.
 - **Plan-first workflow.** Every milestone starts with a written plan and an explicit definition of done, and ends with verification and a log entry ([MEMORY.md](MEMORY.md)).
 - **Reproducible dependencies.** Every Python and npm package is pinned to an exact version. The full Python set was resolved against Python 3.12 on Windows (binary wheels only) and the npm set was checked for peer conflicts before any code was written. Docker images are pinned to exact tags.
 - **Testing strategy.** Unit tests for pure logic (chunking, rank fusion, SSE parsing, routing), agent-path tests using a fake LLM, integration tests against real services, and an end-to-end smoke test against the containers.

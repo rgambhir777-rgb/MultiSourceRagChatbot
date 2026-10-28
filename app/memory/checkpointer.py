@@ -44,6 +44,7 @@ def create_checkpointer(settings: Settings) -> tuple[PostgresSaver, ConnectionPo
         kwargs=kwargs,
         open=True,
         name="ragbot-checkpoints",
+        check=ConnectionPool.check_connection,  # survive Postgres restarts (see app/db/pool.py)
     )
     pool.wait(timeout=settings.postgres_connect_timeout_s)
     ensure_schema(pool, settings.postgres_schema)

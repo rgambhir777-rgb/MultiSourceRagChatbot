@@ -238,3 +238,27 @@ Open **http://localhost:5173**. Try:
 - **Knowledge base** tab: upload your own PDF/DOCX/MD/TXT, or add a public GitHub repo URL.
 
 Each answer shows its cost; a typical one is $0.001–0.005.
+
+---
+
+## CI on GitHub (tests + report on every push to `main`)
+
+The workflow is `.github/workflows/ci.yml`. It runs automatically; nothing is deployed.
+
+**One-time setup: add your OpenAI key as a secret** (needed for the end-to-end tests on `main`):
+1. Open the repo on GitHub → **Settings** → **Secrets and variables** → **Actions**.
+2. **New repository secret** → Name: `OPENAI_API_KEY` → Value: your key → **Add secret**.
+
+Use a key from a project with a monthly budget limit. Each `main` run costs about $0.03.
+
+**Where to see results:** the repo's **Actions** tab → open a run.
+- **Summary:** a table with every suite (passed, failed, skipped, time) and the failures.
+- **Artifacts** (bottom of the run page, kept 14 days): `e2e-report` has the Playwright HTML report with screenshots and the API log; `test-report` has all JUnit files and `summary.md`.
+
+**When it runs:**
+
+| Event | Suites |
+|---|---|
+| Push to `main` | All four (incl. OpenAI-backed E2E and `/ready`) |
+| Pull request into `main` | The free suites only (no OpenAI calls) |
+| Manual (Actions → CI → Run workflow) | All four |

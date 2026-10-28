@@ -7,6 +7,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 export const RESULTS_DIR = "e2e-results";
+const CI = Boolean(process.env.CI); // GitHub Actions sets CI=true
 
 export default defineConfig({
   testDir: "./e2e",
@@ -21,7 +22,10 @@ export default defineConfig({
     ["list"],
     ["html", { outputFolder: `${RESULTS_DIR}/report`, open: "never" }],
     ["json", { outputFile: `${RESULTS_DIR}/results.json` }],
+    // In CI: a JUnit file for the pipeline's test report, and failure notes on GitHub.
+    ...(CI ? [["junit", { outputFile: `${RESULTS_DIR}/e2e.xml` }], ["github"]] : []),
   ],
+  forbidOnly: CI, // a forgotten test.only() must not silently skip the rest in CI
   outputDir: `${RESULTS_DIR}/artifacts`,
   use: {
     baseURL: "http://127.0.0.1:5173",
