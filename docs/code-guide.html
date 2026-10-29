@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Code Guide</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm 16mm 15mm; }
+  :root {
+    --ink: #1c1d24; --muted: #5b5f6e; --line: #d9dbe3; --soft: #f4f5f8;
+    --ui: #4f46e5; --ui-bg: #eef0ff;
+    --api: #0e7490; --api-bg: #e6f6f9;
+    --agent: #b45309; --agent-bg: #fff4e5;
+    --ret: #047857; --ret-bg: #e7f7ef;
+    --store: #6d28d9; --store-bg: #f3edff;
+    --llm: #be123c; --llm-bg: #fff0f3;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; color: var(--ink); background: #fff;
+         font: 10.4pt/1.5 "Segoe UI", system-ui, -apple-system, Arial, sans-serif; }
+  h1 { font-size: 25pt; margin: 0 0 4px; letter-spacing: -0.02em; }
+  h2 { font-size: 15.5pt; margin: 0 0 8px; padding-bottom: 5px; border-bottom: 2px solid var(--line); }
+  h3 { font-size: 11.5pt; margin: 16px 0 5px; }
+  p { margin: 0 0 8px; }
+  ul, ol { margin: 0 0 8px; padding-left: 20px; }
+  li { margin: 2px 0; }
+  code, .mono { font-family: "Cascadia Mono", Consolas, "Courier New", monospace; font-size: 8.9pt; }
+  p code, li code, td code { background: var(--soft); padding: 0 3px; border-radius: 3px; }
+  pre { margin: 6px 0 10px; padding: 9px 11px; background: #f7f7fa; border: 1px solid var(--line);
+        border-left: 3px solid var(--accent, #9aa0b4); border-radius: 5px; white-space: pre-wrap;
+        font-family: "Cascadia Mono", Consolas, monospace; font-size: 8.4pt; line-height: 1.42;
+        break-inside: avoid; }
+  pre .c { color: #6b7080; }
+  table { width: 100%; border-collapse: collapse; margin: 6px 0 12px; font-size: 9.3pt; break-inside: avoid; }
+  th, td { text-align: left; vertical-align: top; padding: 5px 7px; border-bottom: 1px solid var(--line); }
+  th { background: var(--soft); font-weight: 600; }
+  td.f { white-space: nowrap; font-family: "Cascadia Mono", Consolas, monospace; font-size: 8.4pt; }
+  section { break-before: page; }
+  .cover-meta { color: var(--muted); margin-bottom: 14px; }
+  .lede { font-size: 11.2pt; }
+  .figure { margin: 10px 0 6px; border: 1px solid var(--line); border-radius: 8px; padding: 10px; break-inside: avoid; }
+  .caption { font-size: 8.8pt; color: var(--muted); margin-top: 4px; }
+  .tag { display: inline-block; font-size: 8pt; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+         padding: 1px 7px; border-radius: 999px; margin-bottom: 6px; }
+  .why { background: var(--soft); border-radius: 6px; padding: 8px 11px; margin: 8px 0 10px; break-inside: avoid; }
+  .why b { display: block; margin-bottom: 2px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 8.8pt; color: var(--muted); }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+                         margin-right: 5px; vertical-align: -1px; background: var(--sw); }
+  ol.journey li { margin: 4px 0; }
+  .ui     { --accent: var(--ui); }    .ui .tag     { background: var(--ui-bg); color: var(--ui); }
+  .api    { --accent: var(--api); }   .api .tag    { background: var(--api-bg); color: var(--api); }
+  .agent  { --accent: var(--agent); } .agent .tag  { background: var(--agent-bg); color: var(--agent); }
+  .ret    { --accent: var(--ret); }   .ret .tag    { background: var(--ret-bg); color: var(--ret); }
+  .store  { --accent: var(--store); } .store .tag  { background: var(--store-bg); color: var(--store); }
+  .llm    { --accent: var(--llm); }   .llm .tag    { background: var(--llm-bg); color: var(--llm); }
+  svg text { font-family: "Segoe UI", system-ui, Arial, sans-serif; }
+  .toc { columns: 2; font-size: 10pt; }
+  .toc li { break-inside: avoid; }
+  .small { font-size: 9pt; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- ======================================================= 1. COVER + BIG PICTURE -->
+<div>
+  <h1>How the code works</h1>
+  <div class="cover-meta">MultiSourceRagChatbot · a guided tour of the codebase · 29 Oct 2026 (state of <code>main</code> at <code>dcf1597</code>)</div>
+  <p class="lede">The app answers questions using <b>only your documents</b>. The guide follows one question
+    through the system: the <b>UI</b>, the <b>API</b>, the <b>agent</b>, then <b>retrieval</b>
+    (embeddings, the vector database and reranking), and finally the <b>LLM calls</b>.
+    Every section names the exact file, function and line, so you can open it in VS Code
+    (<b>Ctrl+P</b>, type the file name, then <b>Ctrl+G</b> and the line number).</p>
+
+  <div class="figure">
+    <svg viewBox="0 0 760 500" width="100%" role="img" aria-label="System architecture">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#555a6b"/>
+        </marker>
+      </defs>
+      <g stroke="#555a6b" stroke-width="1.6" fill="none" marker-end="url(#ah)">
+        <line x1="380" y1="70" x2="380" y2="93"/>
+        <line x1="330" y1="127" x2="200" y2="148"/>
+        <line x1="430" y1="127" x2="560" y2="148"/>
+        <line x1="195" y1="206" x2="195" y2="233"/>
+        <line x1="565" y1="206" x2="565" y2="233"/>
+        <line x1="55" y1="305" x2="55" y2="438"/>
+        <line x1="225" y1="305" x2="225" y2="333"/>
+        <line x1="545" y1="305" x2="545" y2="333"/>
+        <line x1="350" y1="365" x2="468" y2="365"/>
+        <line x1="290" y1="395" x2="290" y2="438"/>
+        <line x1="495" y1="395" x2="360" y2="438"/>
+        <line x1="680" y1="305" x2="680" y2="438"/>
+      </g>
+      <!-- browser -->
+      <rect x="20" y="10" width="720" height="60" rx="9" fill="#eef0ff" stroke="#4f46e5" stroke-width="1.5"/>
+      <text x="36" y="34" font-size="14" font-weight="700" fill="#4f46e5">Browser · React UI</text>
+      <text x="36" y="54" font-size="11" fill="#33364a">components (ChatWindow, MessageBubble, SourceList, IngestPanel) → hooks (useChatStream…) → src/api (client.js, sse.js)</text>
+      <!-- proxy -->
+      <rect x="250" y="95" width="260" height="32" rx="7" fill="#fff" stroke="#9aa0b4"/>
+      <text x="380" y="115" font-size="11" text-anchor="middle" fill="#33364a">Vite proxy (dev) / nginx (prod) · forwards /api</text>
+      <text x="388" y="88" font-size="9.5" fill="#5b5f6e">HTTP + SSE stream</text>
+      <!-- api -->
+      <rect x="20" y="150" width="350" height="56" rx="8" fill="#e6f6f9" stroke="#0e7490" stroke-width="1.5"/>
+      <text x="34" y="172" font-size="12.5" font-weight="700" fill="#0e7490">FastAPI · routes_chat.py</text>
+      <text x="34" y="192" font-size="10.5" fill="#33364a">POST /api/chat → streams Server-Sent Events</text>
+      <rect x="390" y="150" width="350" height="56" rx="8" fill="#e6f6f9" stroke="#0e7490" stroke-width="1.5"/>
+      <text x="404" y="172" font-size="12.5" font-weight="700" fill="#0e7490">FastAPI · routes_ingest.py</text>
+      <text x="404" y="192" font-size="10.5" fill="#33364a">upload files / add a GitHub repo (background job)</text>
+      <!-- agent + ingestion -->
+      <rect x="20" y="235" width="350" height="70" rx="8" fill="#fff4e5" stroke="#b45309" stroke-width="1.5"/>
+      <text x="34" y="257" font-size="12.5" font-weight="700" fill="#b45309">Agent · LangGraph (app/agent)</text>
+      <text x="34" y="276" font-size="10.3" fill="#33364a">route → retrieve → grade → rewrite → generate</text>
+      <text x="34" y="293" font-size="10.3" fill="#33364a">→ grounding check · memory per conversation</text>
+      <rect x="390" y="235" width="350" height="70" rx="8" fill="#fff4e5" stroke="#b45309" stroke-width="1.5"/>
+      <text x="404" y="257" font-size="12.5" font-weight="700" fill="#b45309">Ingestion pipeline (app/ingestion)</text>
+      <text x="404" y="276" font-size="10.3" fill="#33364a">load → chunk → embed → store</text>
+      <text x="404" y="293" font-size="10.3" fill="#33364a">skips unchanged files (content hash)</text>
+      <!-- retriever + embedder -->
+      <rect x="100" y="335" width="250" height="60" rx="8" fill="#e7f7ef" stroke="#047857" stroke-width="1.5"/>
+      <text x="114" y="357" font-size="12.5" font-weight="700" fill="#047857">Retriever (app/retrieval)</text>
+      <text x="114" y="377" font-size="10.3" fill="#33364a">embed question → hybrid search → rerank</text>
+      <rect x="470" y="335" width="150" height="60" rx="8" fill="#e7f7ef" stroke="#047857" stroke-width="1.5"/>
+      <text x="545" y="355" font-size="12" font-weight="700" fill="#047857" text-anchor="middle">Embedder + Reranker</text>
+      <text x="545" y="371" font-size="9.8" fill="#33364a" text-anchor="middle">FastEmbed models,</text>
+      <text x="545" y="385" font-size="9.8" fill="#33364a" text-anchor="middle">run on your CPU</text>
+      <text x="358" y="358" font-size="9.5" fill="#5b5f6e">uses</text>
+      <!-- external -->
+      <rect x="20" y="440" width="160" height="50" rx="8" fill="#fff0f3" stroke="#be123c" stroke-width="1.5"/>
+      <text x="100" y="461" font-size="12.5" font-weight="700" fill="#be123c" text-anchor="middle">OpenAI API</text>
+      <text x="100" y="479" font-size="9.8" fill="#33364a" text-anchor="middle">gpt-6.1-sol · gpt-6-luna</text>
+      <text x="62" y="425" font-size="9.5" fill="#5b5f6e">LLM calls</text>
+      <rect x="210" y="440" width="160" height="50" rx="8" fill="#f3edff" stroke="#6d28d9" stroke-width="1.5"/>
+      <text x="290" y="461" font-size="12.5" font-weight="700" fill="#6d28d9" text-anchor="middle">Qdrant</text>
+      <text x="290" y="479" font-size="9.8" fill="#33364a" text-anchor="middle">vector database (chunks)</text>
+      <text x="420" y="428" font-size="9.5" fill="#5b5f6e">vectors</text>
+      <rect x="410" y="440" width="150" height="50" rx="8" fill="#f4f5f8" stroke="#9aa0b4" stroke-width="1.5"/>
+      <text x="485" y="461" font-size="12.5" font-weight="700" fill="#33364a" text-anchor="middle">MLflow</text>
+      <text x="485" y="479" font-size="9.8" fill="#33364a" text-anchor="middle">traces of every turn</text>
+      <rect x="590" y="440" width="150" height="50" rx="8" fill="#f3edff" stroke="#6d28d9" stroke-width="1.5"/>
+      <text x="665" y="461" font-size="12.5" font-weight="700" fill="#6d28d9" text-anchor="middle">PostgreSQL</text>
+      <text x="665" y="479" font-size="9.8" fill="#33364a" text-anchor="middle">memory · registry · jobs</text>
+    </svg>
+    <div class="caption">Figure 1: The whole system. Questions flow down the left side; documents flow down the right side. Qdrant, Postgres and MLflow run in Docker (<code>docker-compose.yml</code>). OpenAI is the only paid, external service.</div>
+  </div>
+
+  <div class="legend">
+    <span style="--sw:#4f46e5">UI (React)</span><span style="--sw:#0e7490">API (FastAPI)</span>
+    <span style="--sw:#b45309">Agent / ingestion</span><span style="--sw:#047857">Retrieval &amp; embeddings</span>
+    <span style="--sw:#6d28d9">Databases</span><span style="--sw:#be123c">LLM (OpenAI)</span>
+  </div>
+</div>
+
+<!-- ======================================================= 2. JOURNEY -->
+<section>
+  <h2>The journey of one question</h2>
+  <p>Here's what happens when you type <i>"What does error E-207 mean?"</i> and press Enter. Each step names the code that does it.</p>
+  <ol class="journey">
+    <li><b>You press Enter.</b> <code>ChatInput.jsx</code> calls <code>onSend</code>. <code>App.jsx</code> creates a conversation if this is the first message, then <code>useChatStream.send()</code> starts.</li>
+    <li><b>The browser opens a stream.</b> <code>streamChat()</code> in <code>src/api/sse.js</code> sends <code>POST /api/chat</code> and reads the answer piece by piece as it arrives.</li>
+    <li><b>The API starts the agent.</b> <code>chat()</code> in <code>app/api/routes_chat.py</code> checks the conversation exists and isn't busy, then runs the agent in a worker thread (<code>_run_turn</code>).</li>
+    <li><b>Route</b> (LLM call, cheap model): is this small talk or a question for the documents? It also rewrites follow-ups like "how do I fix it?" into a full question.</li>
+    <li><b>Retrieve</b> (no LLM): turn the question into vectors (<b>embeddings</b>), search <b>Qdrant</b> two ways at once (meaning + keywords), merge the two lists, then <b>rerank</b> the 10 candidates and keep the best 5.</li>
+    <li><b>Grade</b> (LLM call, cheap model): which of those 5 chunks really help? If none do, <b>rewrite</b> the search query and try again (at most 2 times). If still nothing, say "not found" honestly.</li>
+    <li><b>Generate</b> (LLM call, main model, streamed): write the answer from the relevant chunks only, with citations like <code>[1]</code>. Each word is sent to the browser as soon as it's written.</li>
+    <li><b>Grounding check</b> (LLM call, cheap model): is every claim supported by the sources? If not, rewrite the answer once. The badge then shows <i>"Verified against sources"</i>, <i>"Some claims couldn't be verified"</i> or <i>"Not verified"</i> (the check couldn't run).</li>
+    <li><b>Finalize:</b> save the turn in the conversation's memory (Postgres) and send the <code>sources</code> and <code>done</code> events (time and cost).</li>
+    <li><b>The UI updates live.</b> Every event becomes a reducer action in <code>useChatStream.js</code>. <code>MessageBubble</code> shows the steps, the streaming text, the clickable citations, the sources and the badge.</li>
+  </ol>
+
+  <h3>What travels over the stream (Server-Sent Events)</h3>
+  <table>
+    <tr><th>Event</th><th>Sent when</th><th>What the UI does</th></tr>
+    <tr><td><code>status</code></td><td>a step starts/finishes ("Searching your documents"…)</td><td>adds a line to the progress steps (<code>StatusSteps.jsx</code>)</td></tr>
+    <tr><td><code>token</code></td><td>the model writes a few more characters</td><td>appends them to the answer text</td></tr>
+    <tr><td><code>answer_reset</code></td><td>the grounding check asked for a rewrite</td><td>clears the draft answer; the new one streams in</td></tr>
+    <tr><td><code>sources</code></td><td>the answer is final</td><td>shows the numbered sources (<code>SourceList.jsx</code>)</td></tr>
+    <tr><td><code>done</code> / <code>error</code></td><td>the turn ended / something failed</td><td>shows time, cost and badge, or a readable error message</td></tr>
+  </table>
+
+  <div class="why"><b>Why a stream instead of one normal response?</b>
+    A full answer takes 5–25 seconds. Streaming shows progress and the first words after about a second, so the app feels alive. The Stop button aborts the request, and the server then stops paying for tokens nobody will read (<code>cancel.set()</code> in <code>_run_turn</code>).</div>
+</section>
+
+<!-- ======================================================= 3. UI -->
+<section class="ui">
+  <span class="tag">UI · React</span>
+  <h2>1 · The user interface (frontend/)</h2>
+  <p>The UI is a React app built with Vite. It never touches a database or OpenAI directly: it only calls the HTTP API under <code>/api</code>. The code has three layers, and each layer only talks to the one below it:</p>
+  <table>
+    <tr><th>Layer</th><th>Job</th><th>Files</th></tr>
+    <tr><td><b>Components</b></td><td>draw things and react to clicks; no network code</td><td><code>src/App.jsx</code>, <code>src/components/*.jsx</code> (+ <code>.module.css</code> styles)</td></tr>
+    <tr><td><b>Hooks</b></td><td>hold state (messages, sessions, jobs) and call the API</td><td><code>src/hooks/useChatStream.js</code>, <code>useSessions.js</code>, <code>useIngestJobs.js</code></td></tr>
+    <tr><td><b>API</b></td><td>all <code>fetch</code> calls; the stream parser</td><td><code>src/api/client.js</code>, <code>src/api/sse.js</code></td></tr>
+  </table>
+
+  <h3>Where to find each piece on screen</h3>
+  <table>
+    <tr><th>On screen</th><th>File : line</th><th>Notes</th></tr>
+    <tr><td>Whole page: sidebar + Chat / Knowledge base view</td><td class="f">src/App.jsx:11</td><td>wires the hooks to the components</td></tr>
+    <tr><td>Title, input at the top, conversation below</td><td class="f">components/ChatWindow.jsx:14</td><td>example-question chips when empty; auto-scrolls while streaming</td></tr>
+    <tr><td>Message box + Send / Stop</td><td class="f">components/ChatInput.jsx:11</td><td>Enter sends, Shift+Enter adds a new line</td></tr>
+    <tr><td>One question + its answer</td><td class="f">components/MessageBubble.jsx:16</td><td>renders Markdown safely (react-markdown), shows cost/time</td></tr>
+    <tr><td>Progress steps while answering</td><td class="f">components/StatusSteps.jsx:7</td><td>"Searching…", "Checking relevance…"</td></tr>
+    <tr><td>Numbered sources under an answer</td><td class="f">components/SourceList.jsx:9</td><td>clicking <code>[1]</code> in the text opens + highlights source 1</td></tr>
+    <tr><td>Verified / Unverified badge</td><td class="f">components/GroundingBadge.jsx:13</td><td>result of the grounding check</td></tr>
+    <tr><td>Conversation list (left)</td><td class="f">components/SessionSidebar.jsx:5</td><td>slides in from the side on phones</td></tr>
+    <tr><td>Knowledge base tab: upload / GitHub</td><td class="f">components/IngestPanel.jsx:11</td><td>shows documents and job progress</td></tr>
+    <tr><td>Turning <code>[1]</code> into clickable links</td><td class="f">lib/citations.js:13</td><td><code>linkCitations()</code></td></tr>
+  </table>
+
+  <h3>The streaming heart of the UI</h3>
+  <pre><span class="c">// src/api/sse.js:76  (shortened)</span>
+export async function streamChat({ sessionId, message, signal, onEvent }) {
+  response = await fetch(`${API_BASE}/chat`, { method: "POST", body: JSON.stringify(…), signal });
+  const reader = response.body.getReader();          <span class="c">// read the body as it arrives</span>
+  const parser = createSseParser(onEvent);             <span class="c">// sse.js:17 — splits text into events</span>
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    parser.push(decoder.decode(value, { stream: true }));
+  }
+}</pre>
+  <pre><span class="c">// src/hooks/useChatStream.js:165  — every event becomes a reducer action</span>
+onEvent: ({ event, data }) =&gt; {
+  if (event === "status") dispatch({ type: "status", step: data.step });
+  else if (event === "token") dispatch({ type: "token", text: data.text });
+  else if (event === "answer_reset") dispatch({ type: "answer_reset" });
+  else if (event === "sources") dispatch({ type: "sources", sources: data.sources });
+  …
+}</pre>
+  <div class="why"><b>Concepts</b>
+    A <b>hook</b> is a reusable function that holds state for components. A <b>reducer</b> (<code>useChatStream.js:16</code>) is one function that applies every change ("a token arrived") in one place, which makes streaming updates predictable. An <b>AbortController</b> lets the Stop button cancel the request. <code>vite.config.js</code> forwards <code>/api</code> to the Python server on port 8000 during development.</div>
+</section>
+
+<!-- ======================================================= 4. API -->
+<section class="api">
+  <span class="tag">API · FastAPI</span>
+  <h2>2 · The API (app/api/, app/main.py)</h2>
+  <p>FastAPI turns Python functions into web endpoints. <code>app/main.py</code> builds the app (<code>create_app</code>). <code>app/services.py</code> creates the heavy objects (models, database clients, the agent) once, the first time they're needed, and shares them.</p>
+  <table>
+    <tr><th>Endpoint</th><th>File : line</th><th>What it does</th></tr>
+    <tr><td><code>POST /api/chat</code></td><td class="f">api/routes_chat.py:116</td><td>answers one message as a Server-Sent Events stream</td></tr>
+    <tr><td>(helper) run agent in a thread</td><td class="f">api/routes_chat.py:146</td><td><code>_run_turn</code>: worker thread → asyncio queue → stream</td></tr>
+    <tr><td><code>GET/POST/DELETE /api/sessions…</code></td><td class="f">api/routes_chat.py:73–97</td><td>list, create, load history, delete conversations</td></tr>
+    <tr><td><code>POST /api/ingest/files</code></td><td class="f">api/routes_ingest.py:37</td><td>upload documents → background job</td></tr>
+    <tr><td><code>POST /api/ingest/github</code></td><td class="f">api/routes_ingest.py:62</td><td>index a public GitHub repo → background job</td></tr>
+    <tr><td><code>GET /api/jobs</code>, <code>/api/documents</code></td><td class="f">api/routes_ingest.py:73–88</td><td>job progress and the list of indexed documents</td></tr>
+    <tr><td><code>/health</code>, <code>/ready</code></td><td class="f">api/routes_health.py</td><td>is the server up? are Qdrant, Postgres and OpenAI reachable?</td></tr>
+  </table>
+  <pre><span class="c"># app/api/routes_chat.py:146 — the bridge between the agent (normal Python) and the stream (async)</span>
+def work() -&gt; None:
+    for event in agent.stream(message, session_id, cancel):
+        loop.call_soon_threadsafe(queue.put_nowait, event)   <span class="c"># hand each event to the web side</span>
+…
+loop.run_in_executor(None, work)                               <span class="c"># run the agent in a worker thread</span>
+while (item := await queue.get()) is not _END:
+    yield item                                                 <span class="c"># → becomes one SSE event</span></pre>
+  <div class="why"><b>Why a worker thread?</b>
+    The agent does slow, blocking work: CPU-heavy embedding and waiting on OpenAI. If that ran on the web server's main loop, every other user would freeze. The thread does the work, and the queue carries events back to the stream as they happen.</div>
+  <p class="small">Every request and error is logged as JSON (<code>app/logging_setup.py</code>). Settings such as model names, limits and URLs are all read in one place: <code>app/config.py</code>.</p>
+</section>
+
+<!-- ======================================================= 5. INGESTION + EMBEDDINGS -->
+<section class="ret">
+  <span class="tag">Embeddings</span>
+  <h2>3 · Getting documents in, and embeddings</h2>
+  <p>Before anything can be searched, documents are <b>ingested</b>: read, cut into pieces, turned into numbers and stored.</p>
+  <div class="figure">
+    <svg viewBox="0 0 760 112" width="100%" role="img" aria-label="Ingestion pipeline">
+      <defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#555a6b"/></marker></defs>
+      <g stroke="#555a6b" stroke-width="1.6" marker-end="url(#ah2)">
+        <line x1="135" y1="50" x2="161" y2="50"/><line x1="290" y1="50" x2="316" y2="50"/>
+        <line x1="445" y1="50" x2="471" y2="50"/><line x1="600" y1="50" x2="626" y2="50"/>
+      </g>
+      <g font-size="10" fill="#33364a" text-anchor="middle">
+        <rect x="10" y="12" width="125" height="76" rx="8" fill="#f4f5f8" stroke="#9aa0b4"/>
+        <text x="72" y="36" font-size="12.5" font-weight="700">1 · Source</text>
+        <text x="72" y="56">PDF · DOCX · MD · TXT</text><text x="72" y="72">or a GitHub repo</text>
+        <rect x="165" y="12" width="125" height="76" rx="8" fill="#fff4e5" stroke="#b45309"/>
+        <text x="227" y="36" font-size="12.5" font-weight="700" fill="#b45309">2 · Load</text>
+        <text x="227" y="56">loaders.py · github.py</text><text x="227" y="72">file → clean text</text>
+        <rect x="320" y="12" width="125" height="76" rx="8" fill="#fff4e5" stroke="#b45309"/>
+        <text x="382" y="36" font-size="12.5" font-weight="700" fill="#b45309">3 · Chunk</text>
+        <text x="382" y="56">chunking.py</text><text x="382" y="72">~400 tokens, 75 overlap</text>
+        <rect x="475" y="12" width="125" height="76" rx="8" fill="#e7f7ef" stroke="#047857"/>
+        <text x="537" y="36" font-size="12.5" font-weight="700" fill="#047857">4 · Embed</text>
+        <text x="537" y="56">embeddings.py</text><text x="537" y="72">dense + sparse vectors</text>
+        <rect x="630" y="12" width="120" height="76" rx="8" fill="#f3edff" stroke="#6d28d9"/>
+        <text x="690" y="36" font-size="12.5" font-weight="700" fill="#6d28d9">5 · Store</text>
+        <text x="690" y="56">Qdrant: vectors</text><text x="690" y="72">Postgres: registry</text>
+      </g>
+    </svg>
+    <div class="caption">Figure 2: Ingestion. The whole chain is <code>IngestionPipeline.ingest_file()</code> in <code>app/ingestion/pipeline.py:171</code>, which calls <code>_index()</code>.</div>
+  </div>
+  <table>
+    <tr><th>Step</th><th>File : line</th><th>Detail</th></tr>
+    <tr><td>Read a file</td><td class="f">ingestion/loaders.py:85</td><td><code>load_document()</code>: pdfplumber reads PDFs page by page (keeps page numbers), MarkItDown handles DOCX; size/type checks; detects scanned PDFs</td></tr>
+    <tr><td>Fetch a repo</td><td class="f">ingestion/github.py:92</td><td><code>clone_repo()</code>: shallow, size-limited clone; code is only <i>read</i>, never run</td></tr>
+    <tr><td>Cut into chunks</td><td class="f">ingestion/chunking.py:43</td><td><code>chunk_document()</code>: splits by headings first, then about 400 tokens per chunk with 75 tokens of overlap so sentences on the border aren't lost</td></tr>
+    <tr><td>Skip unchanged files</td><td class="f">ingestion/pipeline.py:182</td><td>same content hash as last time → "unchanged", no re-embedding</td></tr>
+    <tr><td>Embed the chunks</td><td class="f">retrieval/embeddings.py:69</td><td><code>embed_passages()</code>: in batches of 32</td></tr>
+  </table>
+
+  <h3>What is an embedding?</h3>
+  <p>An <b>embedding</b> turns text into a list of numbers. Texts with similar <i>meaning</i> get similar numbers, so "the thermostat has no power" lands close to "E-114 low power" even though the words differ. We make <b>two</b> kinds for every chunk and every question:</p>
+  <div class="two">
+    <div class="why"><b>Dense vector: meaning</b>
+      Model <code>BAAI/bge-small-en-v1.5</code>, 384 numbers per text. Good at synonyms and paraphrases. Compared with <i>cosine similarity</i> (how closely two vectors point in the same direction).</div>
+    <div class="why"><b>Sparse vector: keywords</b>
+      Model <code>Qdrant/bm25</code>. Mostly zeros, with one weight per word that appears. Good at exact terms like <code>E-207</code> or <code>URLSafeTimedSerializer</code>, which meaning-based search can miss.</div>
+  </div>
+  <pre><span class="c"># app/retrieval/embeddings.py:47 — both models are loaded ONCE (slow) and reused</span>
+self._dense  = TextEmbedding(settings.embed_dense_model, cache_dir=…)        <span class="c"># bge-small</span>
+self._sparse = SparseTextEmbedding(settings.embed_sparse_model, cache_dir=…)  <span class="c"># BM25</span>
+
+def embed_query(self, text):                      <span class="c"># embeddings.py:78 — for the user's question</span>
+    dense  = next(iter(self._dense.query_embed(text)))
+    sparse = next(iter(self._sparse.query_embed(text)))
+    return dense.tolist(), SparseVector(sparse.indices.tolist(), sparse.values.tolist())</pre>
+  <p class="small">The models come from FastEmbed and run on your CPU through ONNX: no GPU, no API calls, no cost. They are downloaded once into the model cache.</p>
+</section>
+
+<!-- ======================================================= 6. VECTOR DB -->
+<section class="store">
+  <span class="tag">Vector database · Qdrant</span>
+  <h2>4 · The vector database (app/retrieval/vectorstore.py)</h2>
+  <p><b>Qdrant</b> stores every chunk as a <b>point</b>: an ID, the two vectors, and a <b>payload</b> holding the chunk's text, file name, section, page and so on. It runs in Docker on port 6333; its dashboard is at <code>http://localhost:6333/dashboard</code>. Everything lives in one <b>collection</b> called <code>knowledge_base</code>.</p>
+  <table>
+    <tr><th>Function</th><th>File : line</th><th>What it does</th></tr>
+    <tr><td><code>VectorStore</code></td><td class="f">retrieval/vectorstore.py:62</td><td>the only code that talks to Qdrant</td></tr>
+    <tr><td><code>ensure_collection()</code></td><td class="f">retrieval/vectorstore.py:78</td><td>creates the collection: a 384-number cosine "dense" vector + a "sparse" vector with IDF weighting</td></tr>
+    <tr><td><code>upsert_chunks()</code></td><td class="f">retrieval/vectorstore.py:100</td><td>writes (or overwrites) one document's chunks</td></tr>
+    <tr><td><code>point_id()</code></td><td class="f">retrieval/vectorstore.py:57</td><td>stable IDs from (document, chunk number), so re-indexing overwrites instead of duplicating</td></tr>
+    <tr><td><code>search()</code></td><td class="f">retrieval/vectorstore.py:146</td><td>dense, sparse or <b>hybrid</b> search (the default)</td></tr>
+    <tr><td><code>_payload()</code></td><td class="f">retrieval/vectorstore.py:209</td><td>what is stored next to the vectors (text, source, page…)</td></tr>
+  </table>
+  <h3>Hybrid search with RRF: the key idea</h3>
+  <pre><span class="c"># app/retrieval/vectorstore.py:146 — one request, two searches, merged inside Qdrant</span>
+kwargs = {
+    "prefetch": [
+        models.Prefetch(query=dense,        using=DENSE_VECTOR,  limit=limit),  <span class="c"># by meaning</span>
+        models.Prefetch(query=sparse_query, using=SPARSE_VECTOR, limit=limit),  <span class="c"># by keywords</span>
+    ],
+    "query": models.FusionQuery(fusion=models.Fusion.RRF),   <span class="c"># merge the two ranked lists</span>
+}
+response = self._client.query_points(self.collection, limit=limit, with_payload=True, **kwargs)</pre>
+  <div class="why"><b>Why RRF (Reciprocal Rank Fusion)?</b>
+    The two searches score on different scales: cosine scores sit around 0–1, BM25 scores can be 0–30. They can't simply be added. RRF ignores the scores and uses <b>positions</b> instead. Each chunk gets <code>1/(k + rank)</code> from each list, and the scores are added. A chunk that ranks well in <i>both</i> lists comes out on top.</div>
+  <h3>What else lives in PostgreSQL</h3>
+  <p>Qdrant holds the searchable chunks; Postgres holds everything else:</p>
+  <ul>
+    <li><b>Document registry</b>: one row per file (name, hash, chunk count), used to skip unchanged files. Tables are in <code>app/db/schema.sql</code>, code in <code>app/db/repositories.py</code>.</li>
+    <li><b>Ingest jobs</b> (<code>app/db/jobs.py</code>) and <b>conversations</b> (<code>app/db/sessions.py</code>).</li>
+    <li><b>Agent memory</b>: LangGraph <i>checkpoints</i> saved after every step, so a conversation survives a restart (<code>app/memory/checkpointer.py:26</code>).</li>
+  </ul>
+</section>
+
+<!-- ======================================================= 7. RETRIEVAL -->
+<section class="ret">
+  <span class="tag">Retrieval</span>
+  <h2>5 · Retrieval: from question to the best 5 chunks</h2>
+  <div class="figure">
+    <svg viewBox="0 0 760 150" width="100%" role="img" aria-label="Retrieval funnel">
+      <defs><marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#555a6b"/></marker></defs>
+      <g stroke="#555a6b" stroke-width="1.6" marker-end="url(#ah3)" fill="none">
+        <line x1="120" y1="75" x2="148" y2="75"/>
+        <line x1="280" y1="75" x2="300" y2="45"/><line x1="280" y1="75" x2="300" y2="107"/>
+        <line x1="420" y1="45" x2="446" y2="68"/><line x1="420" y1="107" x2="446" y2="84"/>
+        <line x1="555" y1="75" x2="581" y2="75"/>
+      </g>
+      <g font-size="10" fill="#33364a" text-anchor="middle">
+        <rect x="10" y="40" width="110" height="70" rx="8" fill="#eef0ff" stroke="#4f46e5"/>
+        <text x="65" y="66" font-size="12" font-weight="700" fill="#4f46e5">Question</text><text x="65" y="84">"What does</text><text x="65" y="98">E-207 mean?"</text>
+        <rect x="150" y="40" width="130" height="70" rx="8" fill="#e7f7ef" stroke="#047857"/>
+        <text x="215" y="66" font-size="12" font-weight="700" fill="#047857">embed_query</text><text x="215" y="84">dense (384 numbers)</text><text x="215" y="98">+ sparse (keywords)</text>
+        <rect x="302" y="18" width="118" height="54" rx="8" fill="#f3edff" stroke="#6d28d9"/>
+        <text x="361" y="40" font-size="11.5" font-weight="700" fill="#6d28d9">Dense search</text><text x="361" y="58">top 10 by meaning</text>
+        <rect x="302" y="80" width="118" height="54" rx="8" fill="#f3edff" stroke="#6d28d9"/>
+        <text x="361" y="102" font-size="11.5" font-weight="700" fill="#6d28d9">Sparse search</text><text x="361" y="120">top 10 by keywords</text>
+        <rect x="448" y="40" width="107" height="70" rx="8" fill="#f3edff" stroke="#6d28d9"/>
+        <text x="501" y="66" font-size="12" font-weight="700" fill="#6d28d9">RRF fusion</text><text x="501" y="84">merge lists →</text><text x="501" y="98">10 candidates</text>
+        <rect x="583" y="40" width="167" height="70" rx="8" fill="#e7f7ef" stroke="#047857"/>
+        <text x="666" y="64" font-size="12" font-weight="700" fill="#047857">Cross-encoder rerank</text><text x="666" y="82">reads question + chunk</text><text x="666" y="96">together → keep best 5</text>
+      </g>
+    </svg>
+    <div class="caption">Figure 3: The retrieval funnel. A fast, broad search narrows to 10 candidates; a slower, more precise model picks the best 5. No LLM is used here, so it costs nothing.</div>
+  </div>
+  <table>
+    <tr><th>Piece</th><th>File : line</th><th>Detail</th></tr>
+    <tr><td><code>Retriever.retrieve()</code></td><td class="f">retrieval/retriever.py:65</td><td>the whole funnel: embed → search → rerank → top 5</td></tr>
+    <tr><td><code>_rerank()</code></td><td class="f">retrieval/retriever.py:100</td><td>scores each candidate and sorts best-first</td></tr>
+    <tr><td><code>Reranker.score()</code></td><td class="f">retrieval/reranker.py:37</td><td>model <code>Xenova/ms-marco-MiniLM-L-6-v2</code> (FastEmbed, CPU)</td></tr>
+    <tr><td><code>with_context()</code></td><td class="f">ingestion/models.py:41</td><td>adds file name + section to the chunk text, so "Warranty → Claims" helps both search and reranking</td></tr>
+    <tr><td>Settings</td><td class="f">config.py:65–66</td><td><code>retrieve_candidates = 10</code>, <code>rerank_top_k = 5</code></td></tr>
+  </table>
+  <pre><span class="c"># app/retrieval/retriever.py:65 (shortened)</span>
+dense, sparse = self._embedder.embed_query(question)                    <span class="c"># 1. question → vectors</span>
+hits   = self._store.search(dense, sparse, mode="hybrid", limit=10)    <span class="c"># 2. Qdrant hybrid + RRF</span>
+chunks = [_to_chunk(hit) for hit in hits]
+chunks = _rerank(self._reranker, question, chunks)                      <span class="c"># 3. precise re-ordering</span>
+return chunks[:top_k]                                                   <span class="c"># 4. best 5</span></pre>
+  <div class="why"><b>Why two stages (bi-encoder, then cross-encoder)?</b>
+    The embedding model encodes the question and each chunk <i>separately</i>. That's fast, because the chunk vectors are computed once at ingestion, but it's approximate. The <b>cross-encoder</b> reads the question and a chunk <i>together</i>, which is much more accurate but too slow to run on thousands of chunks. So the fast search picks 10 and the precise model orders them.</div>
+</section>
+
+<!-- ======================================================= 8. AGENT -->
+<section class="agent">
+  <span class="tag">Agent · LangGraph</span>
+  <h2>6 · The agent loop (app/agent/)</h2>
+  <p>A plain RAG app does "search, then answer". Ours is <b>agentic</b>: it decides what to do and checks its own work. The flow is a <b>graph</b> of steps (<i>nodes</i>) joined by arrows (<i>edges</i>). Some arrows depend on a decision.</p>
+  <div class="figure">
+    <svg viewBox="0 0 760 270" width="100%" role="img" aria-label="Agent graph">
+      <defs><marker id="ah4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#555a6b"/></marker></defs>
+      <g stroke="#555a6b" stroke-width="1.6" fill="none" marker-end="url(#ah4)">
+        <line x1="110" y1="140" x2="138" y2="140"/>
+        <line x1="240" y1="140" x2="268" y2="140"/>
+        <line x1="370" y1="140" x2="398" y2="140"/>
+        <line x1="500" y1="140" x2="528" y2="140"/>
+        <line x1="640" y1="140" x2="668" y2="140"/>
+        <polyline points="60,120 60,74"/>
+        <polyline points="130,52 710,52 710,118"/>
+        <polyline points="585,120 585,96 450,96 450,118"/>
+        <polyline points="300,160 300,225 242,225"/>
+        <polyline points="190,205 190,162"/>
+        <polyline points="345,160 345,225 418,225"/>
+        <polyline points="540,225 710,225 710,162"/>
+      </g>
+      <g font-size="11" text-anchor="middle" fill="#33364a">
+        <rect x="10" y="30" width="120" height="44" rx="8" fill="#fff" stroke="#b45309" stroke-dasharray="4 3"/>
+        <text x="70" y="50" font-weight="700" fill="#b45309">direct_answer</text><text x="70" y="65" font-size="9.5">greeting / small talk</text>
+        <text x="420" y="45" font-size="9.5" fill="#5b5f6e">no documents needed → reply directly</text>
+
+        <rect x="10" y="120" width="100" height="40" rx="8" fill="#fff0f3" stroke="#be123c"/>
+        <text x="60" y="144" font-weight="700" fill="#be123c">route</text>
+        <rect x="140" y="120" width="100" height="40" rx="8" fill="#e7f7ef" stroke="#047857"/>
+        <text x="190" y="144" font-weight="700" fill="#047857">retrieve</text>
+        <rect x="270" y="120" width="100" height="40" rx="8" fill="#fff0f3" stroke="#be123c"/>
+        <text x="320" y="144" font-weight="700" fill="#be123c">grade</text>
+        <rect x="400" y="120" width="100" height="40" rx="8" fill="#fff0f3" stroke="#be123c"/>
+        <text x="450" y="144" font-weight="700" fill="#be123c">generate</text>
+        <rect x="530" y="120" width="110" height="40" rx="8" fill="#fff0f3" stroke="#be123c"/>
+        <text x="585" y="144" font-weight="700" fill="#be123c">check_grounding</text>
+        <rect x="670" y="120" width="80" height="40" rx="8" fill="#fff4e5" stroke="#b45309"/>
+        <text x="710" y="144" font-weight="700" fill="#b45309">finalize</text>
+
+        <text x="384" y="112" font-size="9" fill="#5b5f6e">relevant</text>
+        <text x="654" y="112" font-size="9" fill="#5b5f6e">ok</text>
+        <text x="517" y="90" font-size="9.5" fill="#5b5f6e">unsupported claims → rewrite answer (max 1)</text>
+
+        <rect x="140" y="205" width="100" height="40" rx="8" fill="#fff0f3" stroke="#be123c"/>
+        <text x="190" y="229" font-weight="700" fill="#be123c">rewrite</text>
+        <text x="272" y="262" font-size="9.5" fill="#5b5f6e">nothing relevant → new query (max 2)</text>
+        <rect x="420" y="205" width="120" height="40" rx="8" fill="#fff4e5" stroke="#b45309"/>
+        <text x="480" y="229" font-weight="700" fill="#b45309">not_found</text>
+        <text x="625" y="218" font-size="9.5" fill="#5b5f6e">still nothing → honest "not found"</text>
+      </g>
+    </svg>
+    <div class="caption">Figure 4: The agent graph, built in <code>build_graph()</code> at <code>app/agent/graph.py:36</code>. <span style="color:#be123c">Red nodes</span> call the LLM; the <span style="color:#047857">green node</span> is the free retrieval. The loops are <b>bounded</b> (<code>max_query_rewrites = 2</code>, <code>max_regenerations = 1</code>), so the agent can't loop forever or run up the bill.</div>
+  </div>
+  <table>
+    <tr><th>Piece</th><th>File : line</th><th>Detail</th></tr>
+    <tr><td>The graph wiring</td><td class="f">agent/graph.py:36</td><td><code>add_node</code> / <code>add_edge</code> / <code>add_conditional_edges</code></td></tr>
+    <tr><td>The node functions</td><td class="f">agent/nodes.py:45–114</td><td>route, retrieve, grade, rewrite, generate, check_grounding, not_found, direct_answer, finalize</td></tr>
+    <tr><td>The decisions on the arrows</td><td class="f">agent/nodes.py:128–139</td><td><code>after_route</code>, <code>after_grade</code>, <code>after_grounding</code></td></tr>
+    <tr><td>Shared state (the "notebook")</td><td class="f">agent/state.py:28</td><td><code>AgentState</code>: question, chunks, answer, counters, messages…</td></tr>
+    <tr><td>Running a turn + streaming</td><td class="f">agent/graph.py:123</td><td><code>RagAgent.stream()</code>; <code>_events_for()</code> (line 167) turns graph updates into UI events</td></tr>
+    <tr><td>Memory</td><td class="f">memory/checkpointer.py:26</td><td>state saved to Postgres per conversation (<code>thread_id</code>)</td></tr>
+  </table>
+  <pre><span class="c"># app/agent/nodes.py:131 — the decision after grading</span>
+def after_grade(self, state):
+    if state.get("relevant"):
+        return "generate"                                   <span class="c"># good chunks → write the answer</span>
+    if state.get("rewrites", 0) &lt; self.d.settings.max_query_rewrites:
+        return "rewrite"                                    <span class="c"># try a better search query</span>
+    return "not_found"                                      <span class="c"># be honest instead of guessing</span></pre>
+</section>
+
+<!-- ======================================================= 9. LLM -->
+<section class="llm">
+  <span class="tag">LLM calls · OpenAI</span>
+  <h2>7 · The LLM calls (app/agent/llm.py, judge.py, prompts.py)</h2>
+  <p>OpenAI is called only from the agent, and every model is created in one function: <code>make_chat_model()</code> (<code>app/agent/llm.py:41</code>). There are two <b>roles</b>. A cheap, fast <b>judge</b> makes the yes/no-style decisions, and a stronger <b>generator</b> writes the answers.</p>
+  <table>
+    <tr><th>Call</th><th>Model</th><th>Code</th><th>Returns</th></tr>
+    <tr><td><b>route</b></td><td>judge: <code>gpt-6-luna</code>, effort none</td><td class="f">agent/judge.py:56</td><td><code>RouteDecision</code>: "retrieve" or "direct" + a standalone question</td></tr>
+    <tr><td><b>grade</b></td><td>judge</td><td class="f">agent/judge.py:64</td><td><code>GradeResult</code>: numbers of the relevant chunks</td></tr>
+    <tr><td><b>rewrite</b></td><td>judge</td><td class="f">agent/judge.py:73</td><td><code>RewrittenQuery</code>: a better search query</td></tr>
+    <tr><td><b>generate</b></td><td>generator: <code>gpt-6.1-sol</code>, effort low, <i>streaming</i></td><td class="f">agent/nodes.py:75</td><td>the answer text with <code>[n]</code> citations</td></tr>
+    <tr><td><b>check_grounding</b></td><td>judge</td><td class="f">agent/judge.py:79</td><td><code>GroundingVerdict</code>: grounded? + unsupported claims</td></tr>
+    <tr><td><b>direct_answer</b></td><td>generator</td><td class="f">agent/nodes.py:109</td><td>a short reply to greetings / small talk</td></tr>
+  </table>
+  <pre><span class="c"># app/agent/llm.py:41 — every cost and safety knob comes from Settings (app/config.py:40–51)</span>
+return ChatOpenAI(
+    model=model, reasoning_effort=effort,
+    max_tokens=settings.llm_max_output_tokens,    <span class="c"># 1024: hard cap on output, and so on cost</span>
+    timeout=settings.llm_request_timeout_s,       <span class="c"># 60 s: never hang forever</span>
+    max_retries=settings.llm_max_retries,         <span class="c"># 2: retry rate limits / server errors</span>
+    streaming=streaming, stream_usage=True,       <span class="c"># count tokens even while streaming</span>
+)</pre>
+  <h3>Structured output: the judge answers in a fixed format</h3>
+  <pre><span class="c"># app/agent/judge.py:87 — one helper used by every judge call</span>
+def _ask(self, schema, system, user):
+    try:
+        structured = self._model.with_structured_output(schema, strict=True)   <span class="c"># JSON matching a Pydantic class</span>
+        result = structured.invoke([SystemMessage(system), HumanMessage(user)])
+    except Exception as exc:                  <span class="c"># network, rate limit, bad output…</span>
+        log.warning("judge_failed", …)
+        return None                           <span class="c"># → the caller uses a safe fallback</span>
+    return result if isinstance(result, schema) else None</pre>
+  <div class="why"><b>Why structured output and fallbacks?</b>
+    The agent's next step depends on the judge's answer. Free text like "Yes, I think passages 1 and 3…" is hard to parse reliably. With <code>strict=True</code>, OpenAI must return JSON matching the schema in <code>app/agent/state.py:51–64</code>. If a call still fails, the agent never crashes: grading keeps all chunks, routing falls back to "search", and grounding shows "Not verified".</div>
+  <table>
+    <tr><th>Also good to know</th><th>Where</th></tr>
+    <tr><td>All prompts (instructions to the models), incl. prompt-injection warnings</td><td class="f">agent/prompts.py:12–82</td></tr>
+    <tr><td>Putting the chunks into the prompt, within a token budget</td><td class="f">agent/rag.py:56 (fit_to_budget), :71 (build_messages)</td></tr>
+    <tr><td>Cost estimate per answer (the "$0.0017" in the UI)</td><td class="f">agent/llm.py:62 (estimate_cost_usd)</td></tr>
+    <tr><td>Tokens + cost logged for every turn</td><td class="f">agent/graph.py (_log_turn)</td></tr>
+    <tr><td>Each turn traced step by step in MLflow (http://localhost:5000)</td><td class="f">observability/tracing.py:23</td></tr>
+  </table>
+  <p class="small">Typical cost: about $0.001–0.005 per question. The generator writes most of the tokens, and the judge calls (usually three, four if a query is rewritten) together cost a fraction of a cent.</p>
+</section>
+
+<!-- ======================================================= 10. MAP -->
+<section>
+  <h2>Cheat sheet: where do I look when…</h2>
+  <table>
+    <tr><th>I want to…</th><th>Open</th></tr>
+    <tr><td>change how the chat screen looks</td><td><code>frontend/src/components/ChatWindow.jsx</code> + <code>ChatWindow.module.css</code></td></tr>
+    <tr><td>change colours / fonts everywhere</td><td><code>frontend/src/index.css</code> (light and dark tokens)</td></tr>
+    <tr><td>change how an answer bubble looks</td><td><code>frontend/src/components/MessageBubble.jsx</code></td></tr>
+    <tr><td>add a new API call in the UI</td><td><code>frontend/src/api/client.js</code>, then use it from a hook</td></tr>
+    <tr><td>change chunk size or overlap</td><td><code>.env</code> → <code>CHUNK_SIZE_TOKENS</code>, <code>CHUNK_OVERLAP_TOKENS</code> (defaults in <code>app/config.py:69–70</code>), then re-ingest</td></tr>
+    <tr><td>get more / fewer chunks per answer</td><td><code>RETRIEVE_CANDIDATES</code>, <code>RERANK_TOP_K</code> (<code>app/config.py:65–66</code>)</td></tr>
+    <tr><td>change what the model is told</td><td><code>app/agent/prompts.py</code></td></tr>
+    <tr><td>change the agent's steps or loops</td><td><code>app/agent/graph.py</code> (wiring), <code>app/agent/nodes.py</code> (steps)</td></tr>
+    <tr><td>change models (ask the owner first: affects cost)</td><td><code>.env</code> → <code>LLM_GENERATOR_MODEL</code>, <code>LLM_JUDGE_MODEL</code></td></tr>
+    <tr><td>support a new file type</td><td><code>app/ingestion/loaders.py</code></td></tr>
+    <tr><td>see what Qdrant stored</td><td>http://localhost:6333/dashboard → collection <code>knowledge_base</code></td></tr>
+    <tr><td>see why an answer came out the way it did</td><td>MLflow traces at http://localhost:5000</td></tr>
+    <tr><td>see how a file gets chunked (stores nothing)</td><td><code>python -m app.ingestion.preview &lt;file&gt;</code></td></tr>
+  </table>
+
+  <h3>Tests that show each part working</h3>
+  <table>
+    <tr><th>Part</th><th>Tests</th></tr>
+    <tr><td>UI components, SSE parser, hooks</td><td><code>frontend/src/**/*.test.jsx|js</code> (Vitest; <code>npm test</code>)</td></tr>
+    <tr><td>Whole app in a real browser</td><td><code>frontend/e2e/*.spec.js</code> (Playwright; <code>npm run e2e</code>)</td></tr>
+    <tr><td>Chunking, fusion, routing logic, prompts (no network)</td><td><code>tests/unit/</code> (<code>pytest</code>)</td></tr>
+    <tr><td>Real Qdrant / Postgres / OpenAI</td><td><code>tests/integration/</code> (<code>pytest -m integration</code>)</td></tr>
+    <tr><td>All of the above on every push to <code>main</code></td><td><code>.github/workflows/ci.yml</code> (GitHub Actions)</td></tr>
+  </table>
+  <p class="small">Line numbers are for commit <code>dcf1597</code>. If code moves later, search for the function name instead (<b>Ctrl+Shift+F</b> in VS Code).</p>
+</section>
+
+</body>
+</html>

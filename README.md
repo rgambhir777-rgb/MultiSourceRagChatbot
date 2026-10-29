@@ -277,6 +277,7 @@ cd frontend && npm ci && npm run dev      # chat UI on http://localhost:5173
 | [SETUP.md](SETUP.md) | Windows setup with verification steps and troubleshooting |
 | [MEMORY.md](MEMORY.md) | Development log: what was built, verified and decided in each milestone |
 | [GLOSSARY.md](GLOSSARY.md) | Plain-language definitions of every term used in the project |
+| [docs/code-guide.pdf](docs/code-guide.pdf) | Illustrated code tour: UI, API, embeddings, vector database, retrieval, agent and LLM calls, with schematics and file:line pointers |
 
 ---
 

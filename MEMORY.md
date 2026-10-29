@@ -629,3 +629,15 @@ Owner asked to run Sessions 4–9 in one go ("go" with no decision answers). Def
 - removing the unused GitPython;
 - confirming the OpenAI budget limit.
 
+---
+
+## Code guide PDF (2026-10-29), owner-requested
+
+- New `docs/` folder:
+  - `code-guide.html` is the source; `code-guide.pdf` is the 13-page A4 version.
+  - It covers the system schematic, the journey of one question, UI, API, ingestion + embeddings, Qdrant/hybrid search/RRF, the retrieval funnel, the agent graph, the LLM calls, and a "where do I look" cheat sheet.
+  - 4 inline SVG schematics. All `file:line` pointers were checked against commit `dcf1597`.
+- `scripts/make_code_guide_pdf.cjs` rebuilds the PDF with the Playwright Chromium already in `frontend/` (no new dependency): `node scripts/make_code_guide_pdf.cjs`.
+- README "Documentation" table links the guide.
+- **Keep in mind:** line numbers drift when code changes. Update the HTML and rerun the script after big refactors.
+
