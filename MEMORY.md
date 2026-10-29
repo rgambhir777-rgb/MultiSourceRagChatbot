@@ -619,3 +619,13 @@ Owner asked to run Sessions 4–9 in one go ("go" with no decision answers). Def
 **Gotcha:** switching git branches can touch `vite.config.js`. Vite then restarts itself in place, and after that restart its `/api` proxy stopped working (the page got HTML instead of JSON, so 12 E2E tests failed). Fix: stop and restart `npm run dev`.
 
 **How CI results are read:** through the GitHub REST API, using the GitHub login saved by Git Credential Manager (owner-approved; read-only, token never printed). The GitHub CLI is not installed.
+
+**Result on GitHub:**
+- PR #5 CI run: backend, frontend, integration and report green; E2E skipped (by design for PRs).
+- Merged into `main` (`c954092`). The full run on `main` (run 40735493031) was green in **all 5 jobs**, E2E included (~$0.03).
+
+**Next step:** Session 10 in `PLAN.md` (Docker images + nginx, one-command deploy). Open owner decisions are unchanged:
+- generator latency option;
+- removing the unused GitPython;
+- confirming the OpenAI budget limit.
+
