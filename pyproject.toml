@@ -32,9 +32,10 @@ testpaths = ["tests"]
 pythonpath = ["."]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-# Plain `pytest` runs only fast, free unit tests. Opt in with: pytest -m integration
-addopts = "-ra --strict-markers -m 'not integration and not openai'"
+# Plain `pytest` runs only fast, free unit tests. Opt in with: pytest -m integration / -m smoke
+addopts = "-ra --strict-markers -m 'not integration and not openai and not smoke'"
 markers = [
     "integration: needs the docker compose services running",
     "openai: calls the real OpenAI API (needs OPENAI_API_KEY)",
+    "smoke: runs against the deployed containers at http://localhost:8080 (docker compose up -d)",
 ]

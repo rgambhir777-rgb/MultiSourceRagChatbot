@@ -82,7 +82,7 @@ the browser only ever talks to one origin, no CORS setup is needed.
 | **PostgreSQL** | Relational database. | Stores the document registry, ingestion jobs, sessions, and LangGraph checkpoints (= memory that survives restarts). One reliable DB instead of several. |
 | **MarkItDown** | Converts PDF/DOCX/etc. into Markdown. | One library for all document types; Markdown headings let us chunk by section. |
 | **Text splitters** | Cut documents into overlapping chunks (by Markdown headers, or by code structure). | LLMs need small, focused pieces; good chunking is the #1 driver of RAG quality. |
-| **GitPython** | Clones git repositories. | Shallow-clone GitHub repos, then reuse the same ingest pipeline on their files. |
+| **git (command line)** | Clones git repositories. | Shallow-clone GitHub repos (called via `subprocess` with a timeout), then reuse the same ingest pipeline on their files. |
 | **FastAPI + Uvicorn** | Python web framework + server. | Typed endpoints, automatic OpenAPI docs at `/docs`, first-class async for streaming. |
 | **SSE (sse-starlette)** | Server-Sent Events: a one-way HTTP stream from server to browser. | Lets tokens and progress ("retrieving…", "checking grounding…") appear live. Simpler than WebSockets. |
 | **pydantic-settings** | Loads config from env vars / `.env` into a typed object. | One validated source of truth for every setting. |
@@ -316,6 +316,7 @@ graph TD;
 - **Concepts:** multi-stage builds & slim images; serving a React build behind a reverse proxy; non-root containers; `npm audit`; baking embedding models into the image; service dependency ordering; resource limits on a 16 GB laptop; secrets via env (the OpenAI key is injected at runtime, never baked into an image); backups of volumes; what "production-credible" means (and what's still missing: auth, TLS, scaling).
 - **Definition of done:** `docker compose down -v` then `docker compose up -d` → all services healthy. The app at `localhost:8080` works end-to-end, and tokens arrive progressively through nginx rather than all at once. The smoke test (ingest sample docs → ask → streamed, cited, grounded answer) passes against the containers; restart survives with memory + index intact; total RAM within budget (≈ ≤ 4 GB).
 - **Homework:** Write in your own words, in `MEMORY.md`, how a message travels from the browser to OpenAI and back, and what each hop costs in time and money.
+- **As built (2026-11-03, owner-approved changes):** API base image `python:3.12.14-slim-trixie`; no `docker/postgres-init.sql` (the API creates its tables on startup, so it would duplicate that); MLflow runs 1 worker with its job runner off (it used 2.2 GB); plain `docker compose up -d` is the full system and development starts only `qdrant postgres mlflow`; a CI `docker` job builds the images and checks the stack; the clean-machine test ran as a separate compose project, so the owner's data volumes were never deleted.
 
 ### Stretch A — Evaluation: hallucination, accuracy, bias
 - **Goal:** Automated quality report. Retrieval metrics (from Session 4) + DeepEval LLM-judge metrics (faithfulness, hallucination, answer relevancy, bias) on the golden set; results logged to MLflow as an experiment run so changes can be compared.

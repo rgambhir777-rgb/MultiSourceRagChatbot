@@ -1,13 +1,18 @@
-# docker-compose.yml — infrastructure services (Phase 1).
-# The api and frontend services are added in Session 10.
+# docker-compose.yml — the whole system, started with one command.
 #
-#   docker compose up -d      start everything in the background
-#   docker compose ps         status + health of each service
-#   docker compose logs -f    follow logs
-#   docker compose down       stop (data is kept in the named volumes)
+#   docker compose up -d --build   build the images (first time / after code changes) and start everything
+#   docker compose up -d           start everything → the app is at http://localhost:8080
+#   docker compose ps              status + health of each service
+#   docker compose logs -f api     follow one service's logs
+#   docker compose down            stop (data is kept in the named volumes)
 #
+#   Development (API + UI run on the laptop with live reload, see SETUP.md):
+#   docker compose up -d qdrant postgres mlflow
+#
+# Start order is enforced with healthchecks: qdrant, postgres, mlflow → api → frontend.
 # Values like ${POSTGRES_USER} are read from .env automatically.
 # Ports are bound to 127.0.0.1 so they are reachable from this laptop only, not the network.
+# Memory limits keep the whole stack within ~4 GB on a 16 GB laptop.
 
 name: ragbot
 
@@ -15,6 +20,7 @@ services:
   qdrant:
     image: qdrant/qdrant:v1.19.2
     restart: unless-stopped
+    mem_limit: 1g
     ports:
       - "127.0.0.1:6333:6333" # HTTP API + web dashboard
       - "127.0.0.1:6334:6334" # gRPC API
@@ -36,6 +42,7 @@ services:
   postgres:
     image: postgres:17.11
     restart: unless-stopped
+    mem_limit: 512m
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-ragbot}
       POSTGRES_USER: ${POSTGRES_USER:-ragbot}
@@ -55,11 +62,18 @@ services:
   mlflow:
     image: ghcr.io/mlflow/mlflow:v3.17.1
     restart: unless-stopped
+    mem_limit: 1g
+    environment:
+      # MLflow 3 starts 8 background "job runner" processes (~220 MB each) for server-side
+      # evaluation jobs. We only send traces, so they are switched off (saves ~1.7 GB).
+      MLFLOW_SERVER_ENABLE_JOB_EXECUTION: "false"
     command:
       - mlflow
       - server
       - --host=0.0.0.0
       - --port=5000
+      # The default is 4 worker processes (~500 MB each); one is plenty for a local trace viewer.
+      - --workers=1
       - --backend-store-uri=sqlite:////mlflow/mlflow.db
       - --artifacts-destination=/mlflow/artifacts
       # MLflow rejects requests whose Host header is not listed (DNS-rebinding protection).
@@ -78,6 +92,68 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    image: ragbot-api:local
+    restart: unless-stopped
+    # Models (~250 MB) + the agent + request spikes while embedding large uploads.
+    mem_limit: 2g
+    # All app settings from .env (optional: CI has none). The OpenAI key arrives here at
+    # runtime; it is never part of the image.
+    env_file:
+      - path: .env
+        required: false
+    # Inside the compose network, services are reached by name, not 127.0.0.1.
+    environment:
+      API_HOST: 0.0.0.0
+      QDRANT_URL: http://qdrant:6333
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      FASTEMBED_CACHE_DIR: /opt/models/fastembed # baked into the image
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000" # API docs at http://localhost:8000/docs
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      # /health = "the process is up". (/ready also checks OpenAI, which costs a network call.)
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    image: ragbot-frontend:local
+    restart: unless-stopped
+    mem_limit: 128m
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-8080}:80" # the app: http://localhost:8080
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
 volumes:
   qdrant_data:

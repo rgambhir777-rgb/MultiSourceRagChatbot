@@ -136,7 +136,7 @@ Every component was chosen against a written comparison of the alternatives. The
 | **Embeddings & reranking** | [FastEmbed](https://github.com/qdrant/fastembed) (ONNX): bge-small, BM25, MiniLM cross-encoder | Fast on CPU with no PyTorch dependency; dense, sparse and reranking in one library |
 | **Vector database** | [Qdrant](https://qdrant.tech) | Native hybrid search with server-side RRF fusion, payload filtering, one lightweight container |
 | **Relational DB / memory** | PostgreSQL 17 | Durable conversation checkpoints plus the app's own tables in one reliable store |
-| **Document parsing** | [MarkItDown](https://github.com/microsoft/markitdown), GitPython | One parser for all formats with structure preserved as Markdown; shallow repo cloning |
+| **Document parsing** | [MarkItDown](https://github.com/microsoft/markitdown), pdfplumber, git | One parser for all formats with structure preserved as Markdown; page-accurate PDFs; shallow repo cloning |
 | **Backend API** | FastAPI, Uvicorn, SSE, Pydantic | Typed, async, auto-generated OpenAPI docs, first-class streaming |
 | **Frontend** | React 19, Vite, react-markdown, CSS Modules | Modern single-page app, fast tooling, safe rendering of model output |
 | **Observability** | MLflow Tracing, structlog | Automatic LangGraph tracing in a single container; structured JSON logs with request IDs |
@@ -236,35 +236,49 @@ The target layout, with folders added as milestones are built:
 
 **Prerequisites:** Docker with Compose (e.g. Docker Desktop), Python 3.12, Node.js 22.12+ (24 LTS recommended), and an **OpenAI API key** (set a project budget limit). A laptop with 8–16 GB of RAM is enough; no GPU is needed.
 
-### Run it locally (development mode, milestones 1–9)
+### Run the whole system (one command)
 
 ```bash
 git clone https://github.com/rgambhir777-rgb/MultiSourceRagChatbot.git
 cd MultiSourceRagChatbot
 cp .env.example .env                      # then set OPENAI_API_KEY in .env
 
-docker compose up -d                      # Qdrant, PostgreSQL, MLflow
-python -m venv .venv && .venv/Scripts/activate && pip install -r requirements.txt
-python -m app.cli ingest data/sample_docs # index the sample documents
-uvicorn app.main:create_app --factory     # API on http://127.0.0.1:8000
-
-cd frontend && npm ci && npm run dev      # chat UI on http://localhost:5173
+docker compose up -d --build              # builds the API + UI images, starts all 5 services
 ```
+
+The first build takes a few minutes: the embedding and reranking models are baked into the API image. After that,
+`docker compose up -d` starts everything in about 40 seconds. Open the **Knowledge base** tab to upload documents or add a
+GitHub repository, then ask away.
 
 | Service | URL |
 |---|---|
-| Chat app (dev) | http://localhost:5173 |
-| API docs (Swagger) | http://127.0.0.1:8000/docs |
-| Tracing (MLflow) | http://127.0.0.1:5000 |
-| Vector DB dashboard | http://127.0.0.1:6333/dashboard |
-
-**One-command deployment** (`docker compose up -d --build`, with the app served by nginx on port 8080) arrives with milestone 10.
-
----|---|
-| Chat app | http://localhost:8080 |
+| Chat app (nginx) | http://localhost:8080 |
 | API docs (Swagger) | http://localhost:8000/docs |
 | Tracing (MLflow) | http://localhost:5000 |
 | Vector DB dashboard | http://localhost:6333/dashboard |
+
+What runs, and in what order (enforced by healthchecks):
+
+| Service | Image | Memory in use* |
+|---|---|---|
+| `qdrant` | `qdrant/qdrant:v1.19.2` | ~150 MB |
+| `postgres` | `postgres:17.11` | ~25 MB |
+| `mlflow` | `ghcr.io/mlflow/mlflow:v3.17.1` (1 worker, job runner off) | ~350 MB |
+| `api` | built from `docker/api.Dockerfile` (Python 3.12 slim, non-root, models baked in) | ~0.4–0.6 GB |
+| `frontend` | built from `docker/frontend.Dockerfile` (Node builds, nginx serves) | ~10 MB |
+
+<sub>*Measured with `docker stats` on the development laptop: about 1–1.3 GB in total.</sub>
+
+### Development mode (live reload)
+
+```bash
+docker compose up -d qdrant postgres mlflow   # only the infrastructure
+python -m venv .venv && .venv/Scripts/activate && pip install -r requirements.txt
+python -m app.cli ingest data/sample_docs     # index the sample documents
+uvicorn app.main:create_app --factory --reload  # API on http://127.0.0.1:8000
+
+cd frontend && npm ci && npm run dev          # chat UI on http://localhost:5173
+```
 
 ---
 

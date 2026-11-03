@@ -28,7 +28,7 @@ def make_openai_client(settings: Settings) -> AsyncOpenAI | None:
         return None
     return AsyncOpenAI(
         api_key=settings.openai_api_key.get_secret_value(),
-        base_url=settings.openai_base_url,  # None means the official api.openai.com
+        base_url=settings.openai_base_url,  # always explicit (see OPENAI_DEFAULT_BASE_URL)
         timeout=settings.llm_request_timeout_s,
         max_retries=settings.llm_max_retries,
     )

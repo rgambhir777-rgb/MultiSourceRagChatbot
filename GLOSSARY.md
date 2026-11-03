@@ -234,6 +234,18 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 - **Feature branch:** A git branch for one piece of work (`session-1`). It is merged into `main` via a pull request once its checks pass.
 - **Pull request (PR):** A request on GitHub to merge a branch into `main`, where the changes can be reviewed first.
 
+- **Slim image:** A smaller variant of an official Docker image (e.g. `python:3.12.14-slim-trixie`) with only what's needed to run. Smaller downloads, and fewer programs an attacker could misuse.
+- **Proxy buffering:** A reverse proxy (nginx) collecting a whole response before passing it on. Good for normal pages, fatal for streaming: the answer would appear all at once at the end. We turn it off for `/api` (`proxy_buffering off`).
+- **SPA fallback:** For a single-page app, the web server answers *every* unknown path with `index.html`, so React can show the right screen (`try_files $uri /index.html` in nginx).
+- **Content Security Policy (CSP):** A response header listing where a page may load scripts, styles and data from. Ours allows only the same site, so injected content can't pull in code from elsewhere.
+- **Non-root container:** A container whose main process runs as an ordinary user. If the app were ever compromised, the attacker wouldn't have admin rights inside the container.
+- **`depends_on` + `service_healthy`:** Compose waits until a service's healthcheck passes before starting the ones that need it (databases → API → UI).
+- **Memory limit (`mem_limit`):** The most RAM a container may use. Above it, the system stops the process (an **OOM kill**, "out of memory") and Docker restarts it. Limits stop one service from slowing the whole laptop down.
+- **Baking models into an image:** Downloading the ML models during `docker build`, so they are part of the image. New containers start fast and work offline, at the cost of a bigger image.
+- **Build-time vs runtime secrets:** Anything copied into an image during the build stays in it forever, for anyone who gets the image. Secrets like the OpenAI key are therefore only passed in when the container *starts* (`env_file` / `environment`).
+- **`npm audit`:** Checks your JavaScript dependencies against a public list of known security problems. `--omit=dev` checks only the code that ships to users.
+- **Compose project:** A named group of containers, networks and volumes (`docker compose -p <name>`). A different project name gets its own fresh volumes, which is how we tested a "clean machine" without deleting real data.
+
 ## Evaluation & automation (stretch)
 
 - **Faithfulness:** Whether the answer's claims are supported by the retrieved context (the opposite of hallucination).
