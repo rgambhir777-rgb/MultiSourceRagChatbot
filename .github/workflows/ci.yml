@@ -5,11 +5,13 @@
 #   pull request → main → the free suites only (no OpenAI calls, no secret needed)
 #   manual run          → like a push to main (Actions tab → CI → Run workflow)
 #
-# Jobs (the four test jobs run in parallel):
+# Jobs (the test jobs run in parallel):
 #   backend-unit   ruff format/lint + pytest unit tests
 #   frontend-unit  ESLint, Prettier, Vitest, production build
 #   integration    our docker-compose.yml (Qdrant, Postgres, MLflow) + pytest -m integration
 #   e2e            services + API + sample data, then Playwright in headless Chromium
+#   docker         builds the API and UI images and starts the WHOLE system with one command
+#                  (no OpenAI calls), then checks the app through nginx
 #   report         one summary table on the run page, plus downloadable reports
 #
 # Security: the workflow can only read the repository; every action is an official GitHub
@@ -133,7 +135,7 @@ jobs:
           path: .cache
           key: models-${{ runner.os }}-${{ hashFiles('requirements.txt', 'app/config.py') }}
       - name: Start Qdrant, Postgres and MLflow (our docker-compose.yml)
-        run: docker compose up -d --wait --wait-timeout 240
+        run: docker compose up -d --wait --wait-timeout 240 qdrant postgres mlflow
       - name: Integration tests (pytest)
         run: |
           mkdir -p reports
@@ -201,7 +203,7 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
       - name: Start Qdrant, Postgres and MLflow (our docker-compose.yml)
-        run: docker compose up -d --wait --wait-timeout 240
+        run: docker compose up -d --wait --wait-timeout 240 qdrant postgres mlflow
       - name: Index the test data (sample docs + pallets/itsdangerous)
         run: |
           python -m app.cli ingest data/sample_docs
@@ -234,6 +236,31 @@ jobs:
           path: frontend/e2e-results/e2e.xml
           retention-days: 14
           if-no-files-found: ignore
+
+  docker:
+    name: Docker · build images + run the full stack
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build the API and UI images
+        run: docker compose build
+      - name: Start everything with one command
+        run: docker compose up -d --wait --wait-timeout 300
+      - name: Check the app through nginx (UI, API proxy, security headers)
+        run: |
+          set -o pipefail
+          curl --fail --silent --show-error -o /dev/null http://127.0.0.1:8080/
+          curl --fail --silent --show-error -o /dev/null http://127.0.0.1:8080/some/page   # SPA fallback
+          curl --fail --silent --show-error http://127.0.0.1:8080/api/sessions; echo
+          curl --fail --silent --show-error -D - -o /dev/null http://127.0.0.1:8080/ | grep -i "content-security-policy"
+          curl --fail --silent --show-error http://127.0.0.1:8000/health; echo
+      - name: Memory use per service
+        if: always()
+        run: docker stats --no-stream --format "table {{.Name}}\t{{.MemUsage}}"
+      - name: Show service logs
+        if: failure()
+        run: docker compose logs --no-color --tail 200
 
   report:
     name: Test report

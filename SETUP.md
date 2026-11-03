@@ -155,10 +155,13 @@ python -c "from dotenv import dotenv_values; from openai import OpenAI; c = dote
 
 ---
 
-## Part B — Start infrastructure (available after Session 1)
+## Part B — Start infrastructure for development (available after Session 1)
+
+For development you run the API and UI on the laptop (live reload), so start only the infrastructure.
+(Plain `docker compose up -d` starts the *whole* system instead; see Part D.)
 
 ```powershell
-docker compose up -d
+docker compose up -d qdrant postgres mlflow
 docker compose ps                              # qdrant, postgres, mlflow all "healthy"
 ```
 
@@ -187,12 +190,28 @@ npm test                          # all tests pass
 npm run build                     # creates frontend\dist
 ```
 
-## Part D — Full system (available after Session 10)
+## Part D — Full system with one command (available after Session 10)
+
+Stop the development servers first (uvicorn on port 8000 would clash with the API container). Then:
 
 ```powershell
-docker compose up -d --build      # the one command
+docker compose up -d --build      # first time, or after code changes: builds the images (a few minutes)
+docker compose up -d              # every other time (~40 s)
+docker compose ps                 # all 5 services "healthy"
 ```
 App: http://localhost:8080 · API docs: http://localhost:8000/docs · Traces: http://localhost:5000
+
+**Verify**
+```powershell
+curl.exe -s http://localhost:8000/ready          # status "ok": qdrant, postgres, mlflow, openai
+.\.venv\Scripts\Activate.ps1
+pytest -m smoke                                    # upload → ask → streamed, cited, verified answer (~$0.005)
+docker stats --no-stream                           # memory per service (about 1–1.3 GB in total)
+```
+
+Your data (documents, vectors, conversations, traces) lives in Docker *volumes* and survives
+`docker compose down` and restarts. Only `docker compose down -v` deletes it, so don't add `-v` unless you
+mean to start from zero.
 
 ## Part E — Troubleshooting
 
@@ -211,6 +230,10 @@ App: http://localhost:8080 · API docs: http://localhost:8000/docs · Traces: ht
 | React app shows "Failed to fetch" / 502 on `/api` | API isn't running, or the wrong port | Start `uvicorn` (dev) or check `docker compose ps` (prod) |
 | Answer appears all at once instead of streaming | A proxy is buffering the stream | Dev: check the Vite proxy config. Prod: `proxy_buffering off` in `frontend/nginx.conf` |
 | Port 5173 or 8080 in use | Another dev server is running | Stop it, or change the port in `vite.config.js` / `.env` |
+| `api` container won't start: port 8000 in use | The development `uvicorn` is still running | Stop it (Ctrl+C), then `docker compose up -d` |
+| A setting in the container has a strange value starting with `#` | `.env` has `KEY=   # comment` with an empty value; Docker Compose reads the comment as the value | Put comments for empty values on their own line (as in `.env.example`) |
+| `docker compose up` fails: `POSTGRES_PASSWORD` must be set | No `.env` file | `Copy-Item .env.example .env` and fill it in |
+| A container keeps restarting | Out of memory (its limit in `docker-compose.yml`) | `docker inspect <container> --format "{{.State.OOMKilled}}"`; raise that service's `mem_limit` |
 
 ---
 
@@ -219,8 +242,8 @@ App: http://localhost:8080 · API docs: http://localhost:8000/docs · Traces: ht
 Each time you want to use the app (after a restart, start Docker Desktop first and wait for "Engine running"):
 
 ```powershell
-# terminal 1: databases + tracing
-docker compose up -d
+# terminal 1: databases + tracing (only the infrastructure, for development)
+docker compose up -d qdrant postgres mlflow
 
 # terminal 2: the API
 .\.venv\Scripts\Activate.ps1

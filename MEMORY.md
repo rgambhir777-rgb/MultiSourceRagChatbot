@@ -641,3 +641,62 @@ Owner asked to run Sessions 4–9 in one go ("go" with no decision answers). Def
 - README "Documentation" table links the guide.
 - **Keep in mind:** line numbers drift when code changes. Update the HTML and rerun the script after big refactors.
 
+---
+
+## Session 10: one-command deployment & hardening (2026-11-03), owner said "go" (all 6 recommendations)
+
+**Approved decisions:**
+1. API base image `python:3.12.14-slim-trixie` (the 3.12.15/16 tags were < 2 weeks old).
+2. Plain `docker compose up -d` = the whole system. Development uses `docker compose up -d qdrant postgres mlflow`.
+3. MLflow limited to 1 worker.
+4. No `docker/postgres-init.sql`: the API creates its tables on startup.
+5. New CI `docker` job.
+6. GitPython removed: unused, because `app/ingestion/github.py` runs `git` via subprocess. `CLAUDE.md`, `PLAN.md` and the README stack rows were updated.
+
+**Built (branch `session-10`):**
+- `docker/api.Dockerfile`:
+  - slim Python + `git`;
+  - dependencies layer first, then models baked in (FastEmbed dense/sparse/reranker + tiktoken, 163 MB) using only `config.py`, so code edits don't re-download them;
+  - non-root `appuser`; 1 uvicorn worker.
+  - Image size 1.38 GB (574 MB is Python libraries).
+- `docker/frontend.Dockerfile`: multi-stage (node 24.22.0 builds, nginx 1.30.6 serves). 93 MB, no Node inside.
+- `frontend/nginx.conf`:
+  - single-page-app fallback;
+  - `/api` proxy with `proxy_buffering off` and 300 s timeouts;
+  - API looked up via Docker DNS on every request (survives API restarts);
+  - `client_max_body_size 500m` (= 20 files × 25 MB);
+  - CSP / nosniff / DENY frames / no-referrer / Permissions-Policy headers;
+  - hashed assets cached for 1 year, `index.html` never cached.
+- `docker-compose.yml`:
+  - adds `api` (`env_file: .env`, optional; in-network URLs; healthcheck on `/health`; depends on qdrant/postgres/mlflow healthy) and `frontend` (:8080, depends on api healthy);
+  - `mem_limit` on every service;
+  - MLflow `--workers=1` and `MLFLOW_SERVER_ENABLE_JOB_EXECUTION=false`.
+- `tests/integration/test_smoke.py` (`pytest -m smoke`, new marker, excluded by default): through nginx it uploads the sample docs → waits for the job → asks about E-207 → checks ≥ 5 token events spread over time (no buffering), a cited answer and grounded = true. It deletes its own conversation.
+- CI: the integration and e2e jobs start only the 3 infrastructure services. The new `docker` job builds the images, runs `up --wait`, checks UI / SPA fallback / `/api` / CSP / `/health` through nginx, and prints `docker stats`. No OpenAI calls.
+
+**Bugs found and fixed while verifying:**
+- **MLflow used 2.2 GB:** 4 web workers by default plus 8 "job runner" processes (~220 MB each). With 1 worker and the job runner off it runs at **~350 MB**. With only workers=1 it was OOM-killed twice at a 768 MB limit.
+- **Docker Compose reads `KEY=   # comment` (empty value) as the value "# comment".** `OPENAI_BASE_URL`, `QDRANT_API_KEY` and `GITHUB_TOKEN` arrived as comment text in the container. Fixes:
+  - `Settings` treats values starting with `#` as unset;
+  - `openai_base_url` now defaults to `https://api.openai.com/v1` and is always passed explicitly, because the OpenAI SDK otherwise reads the `OPENAI_BASE_URL` env var itself;
+  - `.env.example` puts comments for empty values on their own line;
+  - 2 new unit tests.
+
+**Verified (2026-11-03):**
+- Clean-machine test as a separate compose project (`-p ragbot-dod`, fresh volumes; **the owner's volumes were never deleted**): all 5 services healthy in ~2 min from scratch, ~30–40 s afterwards.
+- Through nginx: upload of the 4 sample docs, and GitHub ingest of pallets/itsdangerous (28 files) inside the container. The UI loads with no console errors or CSP violations.
+- Recreating all containers (`down` + `up`): documents, vectors (112) and conversations kept.
+- RAM with the embedding models loaded: about **1 GB in total** after the MLflow fix (2.3 GB before it).
+- ruff OK; 159 unit + 13 free integration tests pass; ESLint / Prettier / Vitest (32) / build OK.
+- `npm audit --omit=dev`: 0 vulnerabilities. Dev tools: 6 moderate findings, all ESLint → minimatch (pattern denial-of-service); dev-only and not in any image; the "fix" is a breaking ESLint downgrade, so it's accepted.
+
+**BLOCKED:** the OpenAI key in `.env` returns **401** (it fails from the laptop too, not just the container), so these are not run yet:
+- the smoke test (streaming through nginx);
+- the OpenAI integration tests;
+- E2E;
+- the `main` CI run (if the GitHub secret is the same key).
+
+**Next:** the owner fixes the key (and the GitHub secret if needed). Then run `pytest -m smoke` and the OpenAI integration tests, measure RAM with the reranker loaded, merge PR → `main`, and set the README roadmap row 10 to ✅.
+
+**Owner's stack now:** `docker compose up -d` (full system) runs on the owner's data: 33 documents, 3 conversations. App at http://localhost:8080.
+
