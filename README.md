@@ -200,7 +200,7 @@ Built in 7 phases (10 milestones plus 2 stretch goals). Each phase ends in a dem
 | | 7 | Agentic loop in LangGraph | ✅ Done |
 | 5 · Product experience | 8 | Persistent memory & streaming chat API | ✅ Done |
 | | 9 | React chat UI | ✅ Done |
-| 6 · Production | 10 | One-command deployment & hardening | ⏳ Next |
+| 6 · Production | 10 | One-command deployment & hardening | ✅ Done |
 | 7 · Stretch | A | Evaluation of hallucination, accuracy and bias | 🔲 Planned |
 | | B | n8n automation workflows | 🔲 Planned |
 

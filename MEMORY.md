@@ -690,13 +690,17 @@ Owner asked to run Sessions 4–9 in one go ("go" with no decision answers). Def
 - ruff OK; 159 unit + 13 free integration tests pass; ESLint / Prettier / Vitest (32) / build OK.
 - `npm audit --omit=dev`: 0 vulnerabilities. Dev tools: 6 moderate findings, all ESLint → minimatch (pattern denial-of-service); dev-only and not in any image; the "fix" is a breaking ESLint downgrade, so it's accepted.
 
-**BLOCKED:** the OpenAI key in `.env` returns **401** (it fails from the laptop too, not just the container), so these are not run yet:
-- the smoke test (streaming through nginx);
-- the OpenAI integration tests;
-- E2E;
-- the `main` CI run (if the GitHub secret is the same key).
+**Unblocked (2026-11-08):** the owner replaced the OpenAI key; `/ready` reports openai ok.
+- Rebuilt images + `up --wait`: all 5 services healthy.
+- `pytest -m smoke` passed (upload → ask → streamed, cited, grounded answer through nginx).
+- `pytest -m "integration or openai"`: 15 passed (13 free + `test_ready` + smoke).
+- RAM with all three models loaded (after a reranked question): api 1.06 GB, mlflow 487 MB, qdrant 196 MB,
+  postgres 63 MB, frontend 8 MB = **about 1.8 GB** in total.
+- Local E2E skipped: another owner app ("AgentProof", `python run.py`) holds port 8000, and the Vite dev proxy
+  targets 8000. The stack ran with `API_PORT=8001` for this run (no file change). E2E runs in CI on `main`.
+- README roadmap row 10 → ✅. PR #6 merged into `main`.
 
-**Next:** the owner fixes the key (and the GitHub secret if needed). Then run `pytest -m smoke` and the OpenAI integration tests, measure RAM with the reranker loaded, merge PR → `main`, and set the README roadmap row 10 to ✅.
+**Session 10 status: done.** Next: deploy to Modal (owner said "go" on 2026-11-08; see the next entry).
 
 **Owner's stack now:** `docker compose up -d` (full system) runs on the owner's data: 33 documents, 3 conversations. App at http://localhost:8080.
 
