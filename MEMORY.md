@@ -704,3 +704,73 @@ Owner asked to run Sessions 4–9 in one go ("go" with no decision answers). Def
 
 **Owner's stack now:** `docker compose up -d` (full system) runs on the owner's data: 33 documents, 3 conversations. App at http://localhost:8080.
 
+
+---
+
+## Modal cloud deployment (2026-11-08 → 09), owner said "go" (hosted databases option); DONE
+
+**Owner standing instruction (2026-11-08):** "Update the github for all steps without asking, unless needed": commit, push, PRs and merges happen without asking. Paid / new services still need approval.
+
+**Approved:**
+- Modal (paid, $30/month free credit), `modal==1.6.2` CLI in `deploy/requirements-modal.txt`. 1.6.3 was < 2 weeks old.
+- Docker Hub public repos under the logged-in account `nusoftinc`.
+- Qdrant Cloud free cluster and Neon Postgres free tier, for Modal only.
+- Basic-auth password on the public site.
+- Recorded in the CLAUDE.md stack table.
+
+**Done (branch `deploy-modal`, PR #7 open):**
+- `docker/modal.Dockerfile`: one container with the API image, Debian nginx and the React files from the frontend image.
+- `deploy/start_web.py`:
+  - writes `/etc/nginx/ragbot.htpasswd` (openssl SHA-512, password via stdin) from `APP_PASSWORD`, and refuses to start if the password is under 12 characters;
+  - starts uvicorn on 127.0.0.1:8000 and waits for `/health`;
+  - starts nginx on 8080; if either process exits, both stop.
+- `deploy/nginx-modal.conf`: like `frontend/nginx.conf`, plus `auth_basic`, HSTS, and `/health` + `/ready`; the `Authorization` header is not forwarded to the API.
+- `deploy/modal_app.py`:
+  - `Image.from_registry("docker.io/nusoftinc/ragbot-modal:0.1.0-f04bf30")` with env `APP_ENV=prod`, `TRACING_ENABLED=false`, `PGSSLMODE=require`;
+  - Modal Secret `ragbot-env`;
+  - 2 CPU, 3 GB, `max_containers=1`, `scaledown_window=300`;
+  - `@modal.web_server(8080, label="ragbot")`;
+  - live URL https://rgambhir777--ragbot.us-east.modal.run (Modal adds the region).
+- `/ready` skips the MLflow check when `tracing_enabled` is false; 1 new unit test. Unit tests now 160.
+- Smoke test reads `SMOKE_BASE_URL` / `SMOKE_PASSWORD` (/ `SMOKE_USERNAME`), so it can test the live site.
+- `deploy/README.md` (how-to, costs, limits); new GLOSSARY terms.
+- Local verification of the Modal image against the compose databases:
+  - 401 with no password or a wrong one, 200 with the right one;
+  - `/ready` reports qdrant, postgres and openai OK;
+  - smoke passes through the password.
+- Images scanned for secrets: none.
+- `.env.modal` (git-ignored) created with the OpenAI key and a generated `APP_PASSWORD`. **Still empty:** `QDRANT_URL`, `QDRANT_API_KEY`, `POSTGRES_HOST`/`DB`/`USER`/`PASSWORD`.
+- Session 10 closed:
+  - PR #6 merged.
+  - The first `main` CI run failed: the GitHub secret `OPENAI_API_KEY` held the old key (401). I updated it from `.env` without printing it; the re-run passed fully, E2E included.
+
+**Facts learned:**
+- Modal cuts every web request off at 150 s.
+- Modal runs containers as root and ignores `USER`.
+- `docker run --env-file` keeps inline `# comments` as part of the value; compose strips them. Test the image with a clean env file.
+- The Docker Hub push failed with `insufficient_scope` until `docker login` refreshed the token.
+- AgentProof (another owner app, `python run.py`) holds port 8000, so use `API_PORT=8001 docker compose up -d` while it runs. The Vite dev proxy is hard-coded to 8000, so local E2E can't run until AgentProof is stopped.
+
+**Docker Hub:** all three images pushed as `nusoftinc/ragbot-{api,frontend,modal}:0.1.0-f04bf30`.
+
+**Deployed (2026-11-09):**
+- The owner created a Qdrant Cloud cluster (AWS us-east-1) and a Neon project (Postgres 18.6, direct host `ep-autumn-wind-bcghpq59.c-16.us-east-1.aws.neon.tech`, pooling off).
+- `modal secret create ragbot-env --from-dotenv .env.modal --force`.
+- `modal deploy` first failed: the workspace defaults to image builder **2026.10**, and modal 1.6.2 supports up to 2025.06. Fixed with `MODAL_IMAGE_BUILDER_VERSION=2025.06` (documented), without upgrading the client.
+- Image pull and build on Modal: 219 s.
+- **Live: https://rgambhir777--ragbot.us-east.modal.run**, username `ragbot`, password = `APP_PASSWORD` in `.env.modal`.
+- Verified live:
+  - cold start 16 s;
+  - 401 with no password or a wrong one, 200 with the right one;
+  - `/ready` reports qdrant, postgres and openai OK;
+  - CSP + HSTS headers present;
+  - `pytest -m smoke` with `SMOKE_BASE_URL` / `SMOKE_PASSWORD` passed (sample docs uploaded to the cloud copy, streamed cited grounded answer);
+  - headless Chromium logged in, the page rendered, no console errors.
+- PR #7 merged into `main`.
+
+**Open issue:** while fixing `.env.modal`, the owner had pasted `user:password@host` into `POSTGRES_HOST`, and Claude's check printed that value, so the Neon password appeared in the conversation (not in git or files). Recommended: reset it in Neon (Roles → Reset password), put the new one in `.env.modal`, re-run `modal secret create ... --force`, then `modal app stop ragbot` + `modal deploy`, so the next start picks up the new secret.
+
+**Next:**
+- The owner rotates the Neon password (above).
+- Stretch A (evaluation).
+- Stretch B (n8n) needs the owner to confirm its licence.

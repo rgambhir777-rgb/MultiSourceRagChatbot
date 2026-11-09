@@ -66,12 +66,17 @@ def build_readiness_checks(
         models = {settings.llm_generator_model, settings.llm_judge_model}
         await asyncio.gather(*(openai_client.models.retrieve(model) for model in models))
 
-    return {
+    checks: dict[str, ReadinessCheck] = {
         "qdrant": check_qdrant,
         "postgres": check_postgres,
         "mlflow": check_mlflow,
         "openai": check_openai,
     }
+    # With tracing off (e.g. the Modal deployment, which has no MLflow server) the API never
+    # talks to MLflow, so a missing MLflow must not make the whole API "not ready".
+    if not settings.tracing_enabled:
+        del checks["mlflow"]
+    return checks
 
 
 @router.get("/health", response_model=HealthResponse)

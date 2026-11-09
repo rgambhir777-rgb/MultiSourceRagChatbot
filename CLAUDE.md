@@ -78,6 +78,9 @@ code readable, and never skip the concept behind a change.
 | CI (tests + report, no deployment) | GitHub Actions: `.github/workflows/ci.yml`, official `actions/*` only, pinned to commit SHAs (owner-requested 2026-10-28) | — | GitHub service (free minutes for private repos) |
 | API container base image | `python:3.12.14-slim-trixie` (official; owner-approved 2026-11-03); models baked in at build time; runs as a non-root user | 3.12.14 | PSF |
 | Frontend serving (prod) | nginx: serves the built files and proxies `/api` to the backend | image `nginx:1.30.6-alpine` (build stage `node:24.22.0-alpine`) | BSD-2 |
+| Cloud deployment (optional) | **Modal** (serverless containers, paid with $30/month free credit; owner-approved 2026-11-08) via the `modal` CLI, pinned in `deploy/requirements-modal.txt`; one password-protected container (`docker/modal.Dockerfile`: API + Debian nginx) | modal 1.6.2 | Service proprietary; client Apache-2.0 |
+| Image registry | Docker Hub, public repos `nusoftinc/ragbot-{api,frontend,modal}`, tagged `<version>-<git sha>` (owner-approved 2026-11-08) | — | Free service |
+| Hosted databases (Modal only) | Qdrant Cloud free cluster + Neon Postgres free tier (owner-approved 2026-11-08). Local/compose setup unchanged | — | Free tiers of proprietary services |
 | Tracing | MLflow Tracing (app: `mlflow-tracing`; server: `ghcr.io/mlflow/mlflow:v3.17.1`) | 3.17.1 | Apache-2.0 |
 | Logging | structlog (JSON logs) | 26.1.0 | MIT / Apache-2.0 |
 | Backend tests / lint | pytest, pytest-asyncio, ruff | 9.1.1 / 1.4.0 / 0.17.1 | MIT |
@@ -98,6 +101,7 @@ Folders are created in the session that needs them (see `PLAN.md`), not up front
 ├── requirements.txt  .env.example  pyproject.toml          # deps + tool config
 ├── docker-compose.yml                                      # all services, one command
 ├── docker/                    # Dockerfiles + DB init scripts
+├── deploy/                    # Modal cloud deployment (modal_app.py, start_web.py, nginx-modal.conf, README.md)
 ├── app/                       # the backend (FastAPI + agent)
 │   ├── config.py              # Settings (pydantic-settings) — the ONLY place env vars are read
 │   ├── logging_setup.py       # structlog JSON logging

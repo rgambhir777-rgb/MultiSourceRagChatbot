@@ -10,9 +10,17 @@ Needs the full stack (`docker compose up -d`) and a valid OPENAI_API_KEY (one an
 Skipped by default; run with:
 
     pytest -m smoke
+
+The same test checks the Modal deployment (deploy/README.md): point it at the site and give it
+the site password. The password comes from an env var, never the command line or a file in git:
+
+    $env:SMOKE_BASE_URL = "https://<workspace>--ragbot-web.modal.run"
+    $env:SMOKE_PASSWORD = "<the APP_PASSWORD you chose>"
+    pytest -m smoke
 """
 
 import json
+import os
 import time
 from collections.abc import Iterator
 from pathlib import Path
@@ -32,8 +40,11 @@ ANSWER_TIMEOUT_S = 120
 
 @pytest.fixture(scope="module")
 def http() -> Iterator[httpx.Client]:
-    base_url = f"http://127.0.0.1:{Settings().frontend_port}"
-    with httpx.Client(base_url=base_url, timeout=30) as client:
+    # Test-only knobs, so they live here rather than in the app's Settings.
+    base_url = os.environ.get("SMOKE_BASE_URL") or f"http://127.0.0.1:{Settings().frontend_port}"
+    password = os.environ.get("SMOKE_PASSWORD")
+    auth = (os.environ.get("SMOKE_USERNAME", "ragbot"), password) if password else None
+    with httpx.Client(base_url=base_url, auth=auth, timeout=30) as client:
         try:
             client.get("/").raise_for_status()
         except httpx.HTTPError as exc:
