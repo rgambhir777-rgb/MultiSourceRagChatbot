@@ -774,3 +774,23 @@ Owner asked to run Sessions 4–9 in one go ("go" with no decision answers). Def
 - The owner rotates the Neon password (above).
 - Stretch A (evaluation).
 - Stretch B (n8n) needs the owner to confirm its licence.
+
+---
+
+## Modal site made public (2026-11-09), owner decision
+
+- **Why:** the owner chose "Option 3: fully public" after seeing the risks table. The OpenAI keys have hard spending caps, and very few people will see the site.
+- **How:** a `PUBLIC_ACCESS` switch (env in `deploy/modal_app.py`, currently `"true"`). `start_web.py` writes `/etc/nginx/ragbot-auth.conf` (`auth_basic off`, or the password rules), and `nginx-modal.conf` includes it. Without the switch and without a 12+ character password, the container still refuses to start.
+- **Image:** `nusoftinc/ragbot-modal:0.1.0-9dcfdbc` (api/frontend images unchanged).
+- **Verified:**
+  - Locally: public mode 200 with no login, smoke passes; password mode 401/200; neither set → refuses to start.
+  - Live: 200 with no login, `/ready` OK, `pytest -m smoke` (no password) passed.
+- **Risks the owner accepted** (also in `deploy/README.md`):
+  - OpenAI cost: capped by the owner;
+  - all chats are visible to every visitor;
+  - anyone can upload or index content;
+  - free storage can fill;
+  - Modal compute is capped by `max_containers=1`.
+- **Switching back:** `PUBLIC_ACCESS: "false"` + new image tag + `modal deploy`, or `modal app stop ragbot` for an immediate stop.
+- **Neon:** the free tier sleeps when idle, so the first `/ready` took 3.3 s for Postgres.
+- **Still open:** rotate the Neon password (see the previous entry).
