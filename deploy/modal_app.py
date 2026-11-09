@@ -38,6 +38,9 @@ image = modal.Image.from_registry(IMAGE).env(
         "APP_ENV": "prod",
         "TRACING_ENABLED": "false",  # there is no MLflow server on Modal
         "PGSSLMODE": "require",  # Neon only accepts encrypted connections
+        # Owner decision 2026-11-09: open to everyone, no password (few visitors, hard spending
+        # caps on the OpenAI key). Risks: deploy/README.md. Set "false" to require the password.
+        "PUBLIC_ACCESS": "true",
     }
 )
 

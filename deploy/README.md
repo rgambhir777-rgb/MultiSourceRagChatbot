@@ -1,14 +1,14 @@
 # Deploying to Modal
 
 The local setup (`docker compose up -d`) stays the main way to run the chatbot. This folder adds
-a **public, password-protected copy on [Modal](https://modal.com)**, a serverless cloud that starts
+a **public copy on [Modal](https://modal.com)**, a serverless cloud that starts
 a container when someone visits and stops it (and the bill) when nobody does.
 
 ## How it fits together
 
 ```
 browser ──https──▶ Modal: one container (image nusoftinc/ragbot-modal on Docker Hub)
-                     ├─ nginx :8080   password check, React app, forwards /api
+                     ├─ nginx :8080   React app, forwards /api (+ password check if enabled)
                      └─ API   :8000   FastAPI + agent + embedding models (CPU)
                              │
                              ├──▶ Qdrant Cloud   (vectors; free 1 GB cluster)
@@ -25,8 +25,8 @@ browser ──https──▶ Modal: one container (image nusoftinc/ragbot-modal 
 | File | Role |
 |---|---|
 | `modal_app.py` | the Modal app: which image, CPU/RAM, scale-to-zero, secrets |
-| `start_web.py` | container start-up: password file → API → wait for `/health` → nginx |
-| `nginx-modal.conf` | nginx for the single container, with HTTP basic auth |
+| `start_web.py` | container start-up: access rules (public / password) → API → wait for `/health` → nginx |
+| `nginx-modal.conf` | nginx for the single container (HTTP basic auth unless public) |
 | `env.modal.example` | template for `.env.modal` (your secrets; git-ignored) |
 | `requirements-modal.txt` | the `modal` command-line tool (not part of the app image) |
 
@@ -68,8 +68,33 @@ $env:MODAL_IMAGE_BUILDER_VERSION = "2025.06"
 modal deploy deploy/modal_app.py
 ```
 
-The site is at **https://rgambhir777--ragbot.us-east.modal.run**. The browser asks for the username and
-password from `.env.modal` (`APP_USERNAME` / `APP_PASSWORD`).
+The site is at **https://rgambhir777--ragbot.us-east.modal.run**.
+
+## Public or password-protected
+
+`PUBLIC_ACCESS` in `modal_app.py` decides who may visit:
+
+- `"true"` (**current setting**, owner decision 2026-11-09): anyone with the link, no login.
+- `"false"`: the browser asks for `APP_USERNAME` / `APP_PASSWORD` from `.env.modal`. Without a
+  password (12+ characters) the container refuses to start, so it can't go online unprotected by
+  accident.
+
+Changing it: edit the line, rebuild + push the `ragbot-modal` image with a new tag, put the tag in
+`IMAGE`, and run `modal deploy` again (the steps above).
+
+**Risks of public mode.** The app was built for one trusted user, so every visitor gets every feature:
+
+| Risk | Why | Mitigation in place |
+|---|---|---|
+| OpenAI bill | each question is a paid call (~1 cent); scripts could ask thousands | **hard spending caps on the OpenAI key** (set by the owner) |
+| Chats are shared | the sidebar lists *all* conversations; anyone can open or delete them | none: don't type anything private |
+| Anyone can add content | file uploads and GitHub indexing are open; spam or prompt-injection text then shapes everyone's answers | few visitors; check *Knowledge base* now and then |
+| Free storage fills up | Qdrant Cloud 1 GB, Neon 0.5 GB | — |
+| Modal compute | steady traffic keeps the container awake | `max_containers=1` caps it at about $85/month worst case |
+| Slow for everyone | one container | — |
+
+If the link spreads further than planned, set `PUBLIC_ACCESS` back to `"false"`, or stop the site
+at once with `modal app stop ragbot`.
 
 ## Test locally (before publishing)
 
@@ -88,7 +113,7 @@ docker rm -f ragbot-modal-test
 
 ```powershell
 $env:SMOKE_BASE_URL = "https://rgambhir777--ragbot.us-east.modal.run"
-$env:SMOKE_PASSWORD = "<APP_PASSWORD>"
+$env:SMOKE_PASSWORD = "<APP_PASSWORD>"   # only when the site is password-protected
 pytest -m smoke          # upload → ask → streamed, cited answer (≈ $0.005 of OpenAI)
 modal app logs ragbot    # the container's logs
 modal app stop ragbot    # take the site offline
