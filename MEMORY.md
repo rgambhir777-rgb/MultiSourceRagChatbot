@@ -751,15 +751,12 @@ Owner asked to run Sessions 4–9 in one go ("go" with no decision answers). Def
 - The Docker Hub push failed with `insufficient_scope` until `docker login` refreshed the token.
 - AgentProof (another owner app, `python run.py`) holds port 8000, so use `API_PORT=8001 docker compose up -d` while it runs. The Vite dev proxy is hard-coded to 8000, so local E2E can't run until AgentProof is stopped.
 
-**Docker Hub:**
-- `ragbot-frontend:0.1.0-f04bf30` pushed.
-- `ragbot-api` and `ragbot-modal` were still uploading when the session ended. Check with `docker push nusoftinc/ragbot-modal:0.1.0-f04bf30`, which is quick if it's already up.
+**Docker Hub:** all three images pushed as `nusoftinc/ragbot-{api,frontend,modal}:0.1.0-f04bf30`.
 
 **Next (tomorrow):**
 1. The owner creates the Qdrant Cloud cluster and the Neon project (pooling OFF) and fills `.env.modal`.
-2. Finish the pushes.
-3. `modal secret create ragbot-env --from-dotenv .env.modal --force`.
-4. `modal deploy deploy/modal_app.py`.
-5. Smoke test against the live URL with `SMOKE_BASE_URL` / `SMOKE_PASSWORD`.
-6. Merge PR #7.
-7. Give the owner the link; update this entry.
+2. `modal secret create ragbot-env --from-dotenv .env.modal --force`.
+3. `modal deploy deploy/modal_app.py`.
+4. Smoke test against the live URL with `SMOKE_BASE_URL` / `SMOKE_PASSWORD`.
+5. Merge PR #7.
+6. Give the owner the link; update this entry.
