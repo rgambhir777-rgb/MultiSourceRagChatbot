@@ -704,3 +704,62 @@ Owner asked to run Sessions 4–9 in one go ("go" with no decision answers). Def
 
 **Owner's stack now:** `docker compose up -d` (full system) runs on the owner's data: 33 documents, 3 conversations. App at http://localhost:8080.
 
+
+---
+
+## Modal cloud deployment (2026-11-08), owner said "go" (hosted databases option); IN PROGRESS
+
+**Owner standing instruction (2026-11-08):** "Update the github for all steps without asking, unless needed": commit, push, PRs and merges happen without asking. Paid / new services still need approval.
+
+**Approved:**
+- Modal (paid, $30/month free credit), `modal==1.6.2` CLI in `deploy/requirements-modal.txt`. 1.6.3 was < 2 weeks old.
+- Docker Hub public repos under the logged-in account `nusoftinc`.
+- Qdrant Cloud free cluster and Neon Postgres free tier, for Modal only.
+- Basic-auth password on the public site.
+- Recorded in the CLAUDE.md stack table.
+
+**Done (branch `deploy-modal`, PR #7 open):**
+- `docker/modal.Dockerfile`: one container with the API image, Debian nginx and the React files from the frontend image.
+- `deploy/start_web.py`:
+  - writes `/etc/nginx/ragbot.htpasswd` (openssl SHA-512, password via stdin) from `APP_PASSWORD`, and refuses to start if the password is under 12 characters;
+  - starts uvicorn on 127.0.0.1:8000 and waits for `/health`;
+  - starts nginx on 8080; if either process exits, both stop.
+- `deploy/nginx-modal.conf`: like `frontend/nginx.conf`, plus `auth_basic`, HSTS, and `/health` + `/ready`; the `Authorization` header is not forwarded to the API.
+- `deploy/modal_app.py`:
+  - `Image.from_registry("docker.io/nusoftinc/ragbot-modal:0.1.0-f04bf30")` with env `APP_ENV=prod`, `TRACING_ENABLED=false`, `PGSSLMODE=require`;
+  - Modal Secret `ragbot-env`;
+  - 2 CPU, 3 GB, `max_containers=1`, `scaledown_window=300`;
+  - `@modal.web_server(8080, label="ragbot")`;
+  - expected URL https://rgambhir777--ragbot.modal.run (confirm after deploy).
+- `/ready` skips the MLflow check when `tracing_enabled` is false; 1 new unit test. Unit tests now 160.
+- Smoke test reads `SMOKE_BASE_URL` / `SMOKE_PASSWORD` (/ `SMOKE_USERNAME`), so it can test the live site.
+- `deploy/README.md` (how-to, costs, limits); new GLOSSARY terms.
+- Local verification of the Modal image against the compose databases:
+  - 401 with no password or a wrong one, 200 with the right one;
+  - `/ready` reports qdrant, postgres and openai OK;
+  - smoke passes through the password.
+- Images scanned for secrets: none.
+- `.env.modal` (git-ignored) created with the OpenAI key and a generated `APP_PASSWORD`. **Still empty:** `QDRANT_URL`, `QDRANT_API_KEY`, `POSTGRES_HOST`/`DB`/`USER`/`PASSWORD`.
+- Session 10 closed:
+  - PR #6 merged.
+  - The first `main` CI run failed: the GitHub secret `OPENAI_API_KEY` held the old key (401). I updated it from `.env` without printing it; the re-run passed fully, E2E included.
+
+**Facts learned:**
+- Modal cuts every web request off at 150 s.
+- Modal runs containers as root and ignores `USER`.
+- `docker run --env-file` keeps inline `# comments` as part of the value; compose strips them. Test the image with a clean env file.
+- The Docker Hub push failed with `insufficient_scope` until `docker login` refreshed the token.
+- AgentProof (another owner app, `python run.py`) holds port 8000, so use `API_PORT=8001 docker compose up -d` while it runs. The Vite dev proxy is hard-coded to 8000, so local E2E can't run until AgentProof is stopped.
+
+**Docker Hub:**
+- `ragbot-frontend:0.1.0-f04bf30` pushed.
+- `ragbot-api` and `ragbot-modal` were still uploading when the session ended. Check with `docker push nusoftinc/ragbot-modal:0.1.0-f04bf30`, which is quick if it's already up.
+
+**Next (tomorrow):**
+1. The owner creates the Qdrant Cloud cluster and the Neon project (pooling OFF) and fills `.env.modal`.
+2. Finish the pushes.
+3. `modal secret create ragbot-env --from-dotenv .env.modal --force`.
+4. `modal deploy deploy/modal_app.py`.
+5. Smoke test against the live URL with `SMOKE_BASE_URL` / `SMOKE_PASSWORD`.
+6. Merge PR #7.
+7. Give the owner the link; update this entry.

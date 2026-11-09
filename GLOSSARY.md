@@ -245,6 +245,14 @@ Plain-language definitions. Add new terms as you meet them (alphabetical within 
 - **Build-time vs runtime secrets:** Anything copied into an image during the build stays in it forever, for anyone who gets the image. Secrets like the OpenAI key are therefore only passed in when the container *starts* (`env_file` / `environment`).
 - **`npm audit`:** Checks your JavaScript dependencies against a public list of known security problems. `--omit=dev` checks only the code that ships to users.
 - **Compose project:** A named group of containers, networks and volumes (`docker compose -p <name>`). A different project name gets its own fresh volumes, which is how we tested a "clean machine" without deleting real data.
+- **Serverless (Modal):** You give the cloud a container image; it starts containers when requests arrive and bills per second only while they run. You never manage a server.
+- **Scale to zero / cold start:** After a quiet period the cloud stops every container, so idle time costs nothing. The next visitor waits while a container starts again (a **cold start**, about a minute for us because of the models).
+- **Container registry (Docker Hub):** An online store for Docker images. `docker push` uploads an image, and another machine (Modal) pulls it from there.
+- **Image tag:** The label after the colon (`ragbot-modal:0.1.0-f04bf30`). We use version + git commit, never `latest`, so you always know exactly which code is running.
+- **HTTP basic auth:** The browser's built-in username/password prompt. nginx checks it on every request; we use it so strangers can't spend our OpenAI money on the public site.
+- **Password hash (SHA-512 crypt):** The password file stores a salted, one-way scrambled version of the password, not the password itself.
+- **Hosted database:** A database run for you by a provider (Qdrant Cloud, Neon). Used on Modal because a container that stops when idle is no place to keep data.
+- **Connection pooler:** A middleman that shares a few database connections between many clients. Neon's pooled mode doesn't support prepared statements, which our chat memory uses, so we connect directly.
 
 ## Evaluation & automation (stretch)
 
