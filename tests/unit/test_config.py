@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.config import Settings
+from app.config import OPENAI_DEFAULT_BASE_URL, Settings
 
 
 def test_defaults_match_the_locked_stack() -> None:
@@ -78,3 +78,23 @@ def test_chunk_overlap_must_be_smaller_than_chunk_size() -> None:
 def test_postgres_conninfo_escapes_special_characters() -> None:
     settings = Settings(_env_file=None, postgres_password="p@ss:w/rd", postgres_host="db")
     assert settings.postgres_conninfo == "postgresql://ragbot:p%40ss%3Aw%2Frd@db:5432/ragbot"
+
+
+def test_comment_text_from_docker_compose_counts_as_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Docker Compose turns `OPENAI_BASE_URL=   # leave empty...` into the value "# leave empty...".
+    monkeypatch.setenv("OPENAI_BASE_URL", "# leave empty for api.openai.com")
+    monkeypatch.setenv("QDRANT_API_KEY", "# empty for local; set in prod")
+    monkeypatch.setenv("GITHUB_TOKEN", "  # optional")
+    settings = Settings(_env_file=None)
+    assert settings.openai_base_url == OPENAI_DEFAULT_BASE_URL
+    assert settings.qdrant_api_key is None
+    assert settings.github_token is None
+
+
+def test_real_optional_values_are_kept(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://example.test/v1")
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_abc#123")  # a "#" inside a value is fine
+    settings = Settings(_env_file=None)
+    assert settings.openai_base_url == "https://example.test/v1"
+    assert settings.github_token is not None
+    assert settings.github_token.get_secret_value() == "ghp_abc#123"

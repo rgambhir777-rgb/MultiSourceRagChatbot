@@ -9,8 +9,12 @@ from functools import lru_cache
 from typing import Annotated, Literal, Self
 from urllib.parse import quote
 
-from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic import Field, SecretStr, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+# Always passed to the OpenAI SDK explicitly: given no URL, the SDK would read the
+# OPENAI_BASE_URL environment variable on its own, bypassing these settings.
+OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1"
 
 ReasoningEffort = Literal["none", "low", "medium", "high", "xhigh", "max"]
 
@@ -36,7 +40,7 @@ class Settings(BaseSettings):
 
     # ---------- LLM (OpenAI) ----------
     openai_api_key: SecretStr | None = None
-    openai_base_url: str | None = None
+    openai_base_url: str = OPENAI_DEFAULT_BASE_URL
     llm_generator_model: str = "gpt-6.1-sol"
     llm_generator_reasoning_effort: ReasoningEffort = "low"
     llm_judge_model: str = "gpt-6-luna"
@@ -112,6 +116,19 @@ class Settings(BaseSettings):
             value = [part for part in value.split(",") if part.strip()]
         if isinstance(value, list):
             return [str(ext).strip().lower() for ext in value]
+        return value
+
+    @field_validator("openai_base_url", "qdrant_api_key", "github_token", mode="before")
+    @classmethod
+    def _comment_means_unset(cls, value: object, info: ValidationInfo) -> object:
+        """Treat a value that is really a comment as "not set".
+
+        Docker Compose reads `KEY=    # some comment` (empty value, then a comment) as the
+        value "# some comment". Passed on, that became a bogus OpenAI URL, Qdrant key and
+        GitHub token inside the API container. No real URL, key or token starts with "#".
+        """
+        if isinstance(value, str) and value.strip().startswith("#"):
+            return OPENAI_DEFAULT_BASE_URL if info.field_name == "openai_base_url" else None
         return value
 
     @model_validator(mode="after")

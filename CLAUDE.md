@@ -66,7 +66,7 @@ code readable, and never skip the concept behind a change.
 | Relational DB / memory | PostgreSQL (app tables + LangGraph checkpoints) | image `postgres:17.11` | PostgreSQL |
 | Document parsing | MarkItDown (`[docx]`) for DOCX; **pdfplumber** for PDFs, page by page (owner-approved 2026-10-26: exact page numbers + scanned-page detection) | 0.1.8 / 0.11.10 | MIT / MIT |
 | Chunking | langchain-text-splitters | 1.1.3 | MIT |
-| GitHub ingestion | GitPython (shallow clone) | 3.2.1 | BSD-3 |
+| GitHub ingestion | the `git` command-line tool via `subprocess` (shallow, read-only clone with a timeout); GitPython removed 2026-11-03 (owner-approved) | git 2.x | GPL-2.0 (tool only, not linked) |
 | API | FastAPI + Uvicorn + sse-starlette | 0.152.0 / 0.54.0 / 3.5.0 | MIT / BSD |
 | Config | pydantic-settings | 2.16.1 | MIT |
 | Frontend framework | React + React DOM | 19.3.1 | MIT |
@@ -76,6 +76,7 @@ code readable, and never skip the concept behind a change.
 | Frontend lint / format | ESLint (+ react-hooks, react-refresh plugins) + Prettier | 10.13.0 / 3.9.10 | MIT |
 | End-to-end (E2E) tests | Playwright (`@playwright/test`, headless Chromium) driving the real app (owner-requested 2026-10-28) | 1.64.1 | Apache-2.0 |
 | CI (tests + report, no deployment) | GitHub Actions: `.github/workflows/ci.yml`, official `actions/*` only, pinned to commit SHAs (owner-requested 2026-10-28) | — | GitHub service (free minutes for private repos) |
+| API container base image | `python:3.12.14-slim-trixie` (official; owner-approved 2026-11-03); models baked in at build time; runs as a non-root user | 3.12.14 | PSF |
 | Frontend serving (prod) | nginx: serves the built files and proxies `/api` to the backend | image `nginx:1.30.6-alpine` (build stage `node:24.22.0-alpine`) | BSD-2 |
 | Tracing | MLflow Tracing (app: `mlflow-tracing`; server: `ghcr.io/mlflow/mlflow:v3.17.1`) | 3.17.1 | Apache-2.0 |
 | Logging | structlog (JSON logs) | 26.1.0 | MIT / Apache-2.0 |
@@ -120,6 +121,7 @@ Folders are created in the session that needs them (see `PLAN.md`), not up front
 ├── evals/                     # golden datasets + evaluation scripts (stretch)
 ├── n8n/                       # exported n8n workflow JSON (stretch)
 ├── data/sample_docs/          # small sample documents for demos/tests (fictional "Lumen Home" product docs)
+├── docs/                      # code-guide.html + code-guide.pdf (rebuild: node scripts/make_code_guide_pdf.cjs)
 ├── scripts/                   # one-off helper scripts (e.g. make_sample_docs.py generates the sample PDF/DOCX)
 └── tests/                     # unit/ and integration/ tests mirroring app/
 ```
@@ -185,11 +187,13 @@ no CORS configuration and no hard-coded hostnames are needed.
 ```powershell
 .\.venv\Scripts\Activate.ps1            # activate virtual environment
 pip install -r requirements.txt          # install pinned deps
-docker compose up -d                     # start all services
+docker compose up -d --build             # build images + start the WHOLE system (app at http://localhost:8080)
+docker compose up -d qdrant postgres mlflow   # development: only the infrastructure (API/UI run locally)
 docker compose ps                        # check service health
 uvicorn app.main:create_app --factory --reload   # run API locally (dev) at http://127.0.0.1:8000
 pytest                                   # fast, free unit tests (default excludes integration/openai)
 pytest -m integration                    # tests against real services (needs docker + OpenAI key)
+pytest -m smoke                          # the deployed containers at :8080 (upload → ask → streamed answer)
 ruff format . ; ruff check .             # backend format + lint
 python -m app.cli ingest data/sample_docs   # index files/folders into Qdrant + Postgres registry
 python -m app.cli ingest-github https://github.com/pallets/itsdangerous   # index a public repo
