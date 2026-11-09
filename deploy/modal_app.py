@@ -9,10 +9,13 @@ What runs where:
 
 Deploy (from the project root, with the venv active):
 
+    $env:MODAL_IMAGE_BUILDER_VERSION = "2025.06"   # newest builder that modal 1.6.2 supports
     modal deploy deploy/modal_app.py
 
-Cost: Modal bills per second while the container runs. It starts on the first visit (about a
-minute: image start + model loading) and stops after SCALEDOWN_S seconds without traffic.
+Live at https://rgambhir777--ragbot.us-east.modal.run (the browser asks for the site password).
+
+Cost: Modal bills per second while the container runs. It starts on the first visit (about
+15-20 s) and stops after SCALEDOWN_S seconds without traffic.
 """
 
 import subprocess

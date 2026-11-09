@@ -707,7 +707,7 @@ Owner asked to run Sessions 4–9 in one go ("go" with no decision answers). Def
 
 ---
 
-## Modal cloud deployment (2026-11-08), owner said "go" (hosted databases option); IN PROGRESS
+## Modal cloud deployment (2026-11-08 → 09), owner said "go" (hosted databases option); DONE
 
 **Owner standing instruction (2026-11-08):** "Update the github for all steps without asking, unless needed": commit, push, PRs and merges happen without asking. Paid / new services still need approval.
 
@@ -730,7 +730,7 @@ Owner asked to run Sessions 4–9 in one go ("go" with no decision answers). Def
   - Modal Secret `ragbot-env`;
   - 2 CPU, 3 GB, `max_containers=1`, `scaledown_window=300`;
   - `@modal.web_server(8080, label="ragbot")`;
-  - expected URL https://rgambhir777--ragbot.modal.run (confirm after deploy).
+  - live URL https://rgambhir777--ragbot.us-east.modal.run (Modal adds the region).
 - `/ready` skips the MLflow check when `tracing_enabled` is false; 1 new unit test. Unit tests now 160.
 - Smoke test reads `SMOKE_BASE_URL` / `SMOKE_PASSWORD` (/ `SMOKE_USERNAME`), so it can test the live site.
 - `deploy/README.md` (how-to, costs, limits); new GLOSSARY terms.
@@ -753,10 +753,24 @@ Owner asked to run Sessions 4–9 in one go ("go" with no decision answers). Def
 
 **Docker Hub:** all three images pushed as `nusoftinc/ragbot-{api,frontend,modal}:0.1.0-f04bf30`.
 
-**Next (tomorrow):**
-1. The owner creates the Qdrant Cloud cluster and the Neon project (pooling OFF) and fills `.env.modal`.
-2. `modal secret create ragbot-env --from-dotenv .env.modal --force`.
-3. `modal deploy deploy/modal_app.py`.
-4. Smoke test against the live URL with `SMOKE_BASE_URL` / `SMOKE_PASSWORD`.
-5. Merge PR #7.
-6. Give the owner the link; update this entry.
+**Deployed (2026-11-09):**
+- The owner created a Qdrant Cloud cluster (AWS us-east-1) and a Neon project (Postgres 18.6, direct host `ep-autumn-wind-bcghpq59.c-16.us-east-1.aws.neon.tech`, pooling off).
+- `modal secret create ragbot-env --from-dotenv .env.modal --force`.
+- `modal deploy` first failed: the workspace defaults to image builder **2026.10**, and modal 1.6.2 supports up to 2025.06. Fixed with `MODAL_IMAGE_BUILDER_VERSION=2025.06` (documented), without upgrading the client.
+- Image pull and build on Modal: 219 s.
+- **Live: https://rgambhir777--ragbot.us-east.modal.run**, username `ragbot`, password = `APP_PASSWORD` in `.env.modal`.
+- Verified live:
+  - cold start 16 s;
+  - 401 with no password or a wrong one, 200 with the right one;
+  - `/ready` reports qdrant, postgres and openai OK;
+  - CSP + HSTS headers present;
+  - `pytest -m smoke` with `SMOKE_BASE_URL` / `SMOKE_PASSWORD` passed (sample docs uploaded to the cloud copy, streamed cited grounded answer);
+  - headless Chromium logged in, the page rendered, no console errors.
+- PR #7 merged into `main`.
+
+**Open issue:** while fixing `.env.modal`, the owner had pasted `user:password@host` into `POSTGRES_HOST`, and Claude's check printed that value, so the Neon password appeared in the conversation (not in git or files). Recommended: reset it in Neon (Roles → Reset password), put the new one in `.env.modal`, re-run `modal secret create ... --force`, then `modal app stop ragbot` + `modal deploy`, so the next start picks up the new secret.
+
+**Next:**
+- The owner rotates the Neon password (above).
+- Stretch A (evaluation).
+- Stretch B (n8n) needs the owner to confirm its licence.
