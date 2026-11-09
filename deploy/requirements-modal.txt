@@ -1,0 +1,4 @@
+# Deploy-time tool only: the Modal command-line client used to deploy the app (deploy/modal_app.py).
+# Kept out of requirements.txt so it never ends up inside the app's Docker image.
+# Install into the project venv:  pip install -r deploy/requirements-modal.txt
+modal==1.6.2  # Apache-2.0

@@ -60,9 +60,17 @@ def test_ready_times_out_slow_dependencies(client: TestClient) -> None:
 
 
 async def test_default_checks_cover_every_dependency(settings: Settings) -> None:
+    with_tracing = settings.model_copy(update={"tracing_enabled": True})
     async with httpx.AsyncClient() as http:
-        checks = build_readiness_checks(settings, http, openai_client=None)
+        checks = build_readiness_checks(with_tracing, http, openai_client=None)
     assert set(checks) == {"qdrant", "postgres", "mlflow", "openai"}
+
+
+async def test_mlflow_is_not_checked_when_tracing_is_off(settings: Settings) -> None:
+    no_tracing = settings.model_copy(update={"tracing_enabled": False})
+    async with httpx.AsyncClient() as http:
+        checks = build_readiness_checks(no_tracing, http, openai_client=None)
+    assert set(checks) == {"qdrant", "postgres", "openai"}
 
 
 async def test_openai_check_fails_clearly_without_api_key(settings: Settings) -> None:
