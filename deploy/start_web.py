@@ -3,16 +3,19 @@
 It runs inside the image built by docker/modal.Dockerfile and starts two programs:
 
 1. the API (uvicorn) on 127.0.0.1:8000, reachable only from inside the container;
-2. nginx on 0.0.0.0:8080: serves the React app, forwards /api to the API, asks for a password.
+2. nginx on 0.0.0.0:8080: serves the React app, forwards /api to the API, and (unless the site
+   is public) asks for a password.
 
 Steps:
-- write nginx's password file from APP_USERNAME / APP_PASSWORD (env vars from a Modal Secret).
-  It refuses to start without a password, so the app can never go online unprotected;
+- decide who may visit. PUBLIC_ACCESS=true: anyone, no password (an explicit choice, see
+  deploy/README.md for the risks). Otherwise: write nginx's password file from APP_USERNAME /
+  APP_PASSWORD (from a Modal Secret), and refuse to start without a password, so the site can
+  never go online unprotected by accident;
 - start the API and wait until /health answers, so the first visitors don't get "502 Bad Gateway";
 - start nginx, then wait. If either program stops, stop the other one too and exit, so Modal
   replaces the container instead of serving a half-working app.
 
-This is deployment tooling, not app code, so it reads its own two env vars directly; the API
+This is deployment tooling, not app code, so it reads its own few env vars directly; the API
 itself still reads all of its configuration through app/config.py.
 """
 
@@ -25,6 +28,7 @@ import urllib.request
 from pathlib import Path
 
 HTPASSWD = Path("/etc/nginx/ragbot.htpasswd")
+AUTH_CONF = Path("/etc/nginx/ragbot-auth.conf")  # included by deploy/nginx-modal.conf
 # Full paths, so a planted program earlier on PATH can't be started instead.
 UVICORN = "/usr/local/bin/uvicorn"
 NGINX = "/usr/sbin/nginx"
@@ -35,6 +39,16 @@ MIN_PASSWORD_LENGTH = 12
 
 logging.basicConfig(level=logging.INFO, format="start_web: %(message)s", stream=sys.stdout)
 log = logging.getLogger("start_web")
+
+
+def configure_access() -> None:
+    """Write nginx's access rules: open to everyone, or password-protected (the default)."""
+    if os.environ.get("PUBLIC_ACCESS", "").strip().lower() == "true":
+        AUTH_CONF.write_text("auth_basic off;\n")
+        log.warning("PUBLIC_ACCESS=true: the site is open to everyone, no password")
+        return
+    write_password_file()
+    AUTH_CONF.write_text(f'auth_basic "MultiSource RAG Chat";\nauth_basic_user_file {HTPASSWD};\n')
 
 
 def write_password_file() -> None:
@@ -85,7 +99,7 @@ def start_api() -> subprocess.Popen[bytes]:
 
 def main() -> None:
     """Start both programs and exit as soon as either one stops."""
-    write_password_file()
+    configure_access()
     api = start_api()
     nginx = subprocess.Popen([NGINX, "-g", "daemon off;"])  # noqa: S603 - fixed arguments
     log.info("nginx started on port 8080")
